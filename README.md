@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="README.de.md">Deutsch</a> ·
-  <a href="https://rescue.anycast.io">Download</a> ·
+  <a href="https://rescue.2342.ai">Download</a> ·
   <a href="#build-it-yourself">Build it yourself</a> ·
   <a href="#the-configuration-slot">Configuration slot</a> ·
   <a href="https://2342.ai">2342.ai</a> ·
@@ -29,7 +29,7 @@ That is what Agentic Rescue does. It is SystemRescue with a brain, built from a 
 - **A rescue console that looks good.** kmscon on tty1 with JetBrains Mono, truecolor and a Tokyo Night palette, tmux underneath, a `gum` menu on top. A second boot entry with `nomodeset` for difficult GPUs.
 - **Three agents.** `opencode`, `claude` and `codex` are installed and preconfigured. They read `/etc/agentic-rescue/AGENTS.md`, which tells them where they are, how NixOS, Arch, Debian, Fedora and Windows installs look from the outside, and the rules: diagnose read-only first, never run anything destructive without showing the command and getting a yes, back up before editing.
 - **One key for all three.** [2342.ai](https://2342.ai) speaks the OpenAI-compatible, Responses and Anthropic Messages APIs. A single key drives opencode, Codex and Claude Code, with a visible data path and one budget. Groq, Google AI Studio, OpenRouter and OpenCode Zen work too and have free tiers. Anthropic and OpenAI keys work directly.
-- **Configured before it ever boots.** The ISO has a 16 KiB configuration slot. The [download page](https://rescue.anycast.io) writes your key, Wi-Fi, SSH key and keyboard layout into it *in the browser* while the image streams to your disk. No server sees the key, no image is rebuilt per user.
+- **Configured before it ever boots.** The ISO has a 16 KiB configuration slot. The [download page](https://rescue.2342.ai) writes your key, Wi-Fi, SSH key and keyboard layout into it *in the browser* while the image streams to your disk. No server sees the key, no image is rebuilt per user.
 - **Or configured at the console.** No key in the slot? `C-Space k` shows a QR code. Your phone opens a one-time page on the local network and pastes the key in. Claude and Codex subscribers sign in the same way: `C-Space u` hands the sign-in link to the phone and takes the code back.
 - **Real filesystem support.** ZFS, Btrfs, XFS, ext4, NTFS, exFAT, F2FS, LUKS, LVM, mdadm. `rescue-mount` finds the installed system, unlocks it, mounts it read-only at `/mnt` with the right subvolumes, and `rescue-enter` chroots in with `nixos-enter` or `arch-chroot`.
 - **Works offline.** The `offline` variant ships a local 4B model (Qwen3-4B-Instruct, Q4) served by llama.cpp. Slow, but it reads logs and calls tools without any network.
@@ -38,7 +38,7 @@ That is what Agentic Rescue does. It is SystemRescue with a brain, built from a 
 
 ## Quick start
 
-1. Go to [rescue.anycast.io](https://rescue.anycast.io), pick a provider, paste a key, download.
+1. Go to [rescue.2342.ai](https://rescue.2342.ai), pick a provider, paste a key, download.
 2. Write the file to a stick: `dd if=agentic-rescue-*.iso of=/dev/sdX bs=4M status=progress oflag=sync`, or use Etcher or Ventoy.
 3. Boot it. You land in the menu. `rescue-mount`, then `opencode`.
 

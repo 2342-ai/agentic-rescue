@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="README.md">English</a> ·
-  <a href="https://rescue.anycast.io">Download</a> ·
+  <a href="https://rescue.2342.ai">Download</a> ·
   <a href="#selbst-bauen">Selbst bauen</a> ·
   <a href="#der-konfigurations-slot">Konfigurations-Slot</a> ·
   <a href="https://2342.ai">2342.ai</a> ·
@@ -29,7 +29,7 @@ Das ist Agentic Rescue. SystemRescue mit Verstand, gebaut aus einem einzigen Nix
 - **Eine Konsole, die gut aussieht.** kmscon auf tty1 mit JetBrains Mono, Truecolor und Tokyo-Night-Palette, darunter tmux, darüber ein `gum`-Menü. Ein zweiter Booteintrag mit `nomodeset` für schwierige GPUs.
 - **Drei Agenten.** `opencode`, `claude` und `codex` sind installiert und vorkonfiguriert. Sie lesen `/etc/agentic-rescue/AGENTS.md`: wo sie sind, wie NixOS-, Arch-, Debian-, Fedora- und Windows-Installationen von außen aussehen, und die Regeln. Erst nur lesend diagnostizieren, nichts Destruktives ohne gezeigten Befehl und ausdrückliches Ja, Backup vor jeder Änderung.
 - **Ein Key für alle drei.** [2342.ai](https://2342.ai) spricht die OpenAI-kompatible API, die Responses API und die Anthropic Messages API. Ein einziger Key versorgt opencode, Codex und Claude Code, mit sichtbarem Datenpfad und einem Budget. Groq, Google AI Studio, OpenRouter und OpenCode Zen funktionieren ebenfalls und haben kostenlose Kontingente. Anthropic- und OpenAI-Keys gehen direkt.
-- **Konfiguriert, bevor es je gebootet hat.** Die ISO enthält einen 16-KiB-Konfigurations-Slot. Die [Download-Seite](https://rescue.anycast.io) schreibt Key, WLAN, SSH-Key und Tastaturlayout *im Browser* hinein, während das Image auf deine Platte streamt. Kein Server sieht den Key, kein Image wird pro Nutzer neu gebaut.
+- **Konfiguriert, bevor es je gebootet hat.** Die ISO enthält einen 16-KiB-Konfigurations-Slot. Die [Download-Seite](https://rescue.2342.ai) schreibt Key, WLAN, SSH-Key und Tastaturlayout *im Browser* hinein, während das Image auf deine Platte streamt. Kein Server sieht den Key, kein Image wird pro Nutzer neu gebaut.
 - **Oder konfiguriert an der Konsole.** Kein Key im Slot? `C-Space k` zeigt einen QR-Code. Das Handy öffnet eine Einmal-Seite im lokalen Netz und trägt den Key ein. Claude- und Codex-Abonnenten melden sich genauso an: `C-Space u` reicht den Anmeldelink ans Handy und holt den Code zurück.
 - **Echte Dateisystem-Unterstützung.** ZFS, Btrfs, XFS, ext4, NTFS, exFAT, F2FS, LUKS, LVM, mdadm. `rescue-mount` findet das installierte System, entsperrt es, hängt es mit den richtigen Subvolumes nur lesend unter `/mnt` ein, und `rescue-enter` wechselt mit `nixos-enter` oder `arch-chroot` hinein.
 - **Funktioniert offline.** Die Variante `offline` bringt ein lokales 4B-Modell mit (Qwen3-4B-Instruct, Q4), das llama.cpp ausliefert. Langsam, aber es liest Logs und ruft Werkzeuge ohne Netz.
@@ -38,7 +38,7 @@ Das ist Agentic Rescue. SystemRescue mit Verstand, gebaut aus einem einzigen Nix
 
 ## Schnellstart
 
-1. Auf [rescue.anycast.io](https://rescue.anycast.io) Anbieter wählen, Key einfügen, herunterladen.
+1. Auf [rescue.2342.ai](https://rescue.2342.ai) Anbieter wählen, Key einfügen, herunterladen.
 2. Datei auf einen Stick schreiben: `dd if=agentic-rescue-*.iso of=/dev/sdX bs=4M status=progress oflag=sync`, oder mit Etcher oder Ventoy.
 3. Booten. Du landest im Menü. `rescue-mount`, dann `opencode`.
 
