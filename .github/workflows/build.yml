@@ -49,7 +49,7 @@ jobs:
           cat result/release.json
       - name: End-to-end slot patch check
         if: steps.want.outputs.run == 'true' && matrix.variant == 'online'
-        run: nix build -L .#checks.x86_64-linux.slot-patch
+        run: nix build -L --no-link .#checks.x86_64-linux.slot-patch
       - name: Collect artifacts
         if: steps.want.outputs.run == 'true'
         run: |
