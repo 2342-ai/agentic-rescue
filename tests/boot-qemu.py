@@ -112,7 +112,7 @@ def main():
         os.write(fd, script.encode())
         text = read_until(fd, [f"{marker}-END"], 60, log)
         body = text.split(f"{marker}-BEGIN", 1)[-1]
-        body = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", body)
+        body = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b[()][A-Z0-9]|\x1b\][^\x07\x1b]*(\x07|\x1b\\\\)", "", body)
         print("\n----- console output -----\n" + body.strip() + "\n--------------------------\n")
         checks = {"config service active": "SERVICE=active" in body,
                   "opencode config": "OPENCODE_CONFIG_OK" in body,
