@@ -126,7 +126,7 @@
     throw new Error("nostream");
   }
 
-  async function downloadPatched({ release, isoUrl, config, filename, onProgress, onStatus }) {
+  async function downloadPatched({ release, isoUrl, config, filename, onProgress }) {
     const sha = new Sha256();
     const payload = config ? encodeSlot(config, release.configLength) : null;
     const sink = await openSink(filename, release.size);
@@ -139,5 +139,89 @@
     return { verified: hex === release.sha256, sha256: hex };
   }
 
-  window.RescuePatch = { downloadPatched, encodeSlot, Sha256, SLOT_MAGIC };
+  // ---------------------------------------------------------------- local ISO
+  // For images downloaded without CORS (GitHub Releases): the person picks the
+  // downloaded file, the page finds the slot through the ISO9660 directory and
+  // writes a new file made of two untouched slices of the original plus the
+  // 16 KiB payload. Blob slices are lazy, so nothing is loaded into memory.
+
+  const SECTOR = 2048;
+
+  async function bytes(file, start, end) {
+    return new Uint8Array(await file.slice(start, end).arrayBuffer());
+  }
+
+  function ascii(u8) {
+    let out = "";
+    for (const b of u8) out += String.fromCharCode(b);
+    return out;
+  }
+
+  async function readDirectory(file, lba, size) {
+    const dir = await bytes(file, lba * SECTOR, lba * SECTOR + size);
+    const entries = [];
+    let i = 0;
+    while (i < dir.length) {
+      const len = dir[i];
+      if (len === 0) { i = (Math.floor(i / SECTOR) + 1) * SECTOR; continue; }
+      const dv = new DataView(dir.buffer, dir.byteOffset + i, len);
+      const nameLen = dir[i + 32];
+      entries.push({
+        lba: dv.getUint32(2, true),
+        size: dv.getUint32(10, true),
+        dir: (dir[i + 25] & 2) !== 0,
+        name: ascii(dir.subarray(i + 33, i + 33 + nameLen)).replace(/;\d+$/, "").toUpperCase(),
+      });
+      i += len;
+    }
+    return entries;
+  }
+
+  // Returns { offset, length, current, version } or throws Error("notiso" | "noslot").
+  async function inspectIso(file) {
+    const pvd = await bytes(file, 16 * SECTOR, 17 * SECTOR);
+    if (pvd[0] !== 1 || ascii(pvd.subarray(1, 6)) !== "CD001") throw new Error("notiso");
+    const dv = new DataView(pvd.buffer, pvd.byteOffset);
+    const entries = await readDirectory(file, dv.getUint32(156 + 2, true), dv.getUint32(156 + 10, true));
+    const entry = entries.find((e) => !e.dir && e.name === "RESCUE_CONFIG.JSON");
+    if (!entry) throw new Error("noslot");
+    const offset = entry.lba * SECTOR;
+    const raw = await bytes(file, offset, offset + entry.size);
+    let current;
+    try {
+      current = JSON.parse(new TextDecoder().decode(raw).replace(/[\s\0]+$/, ""));
+    } catch (e) {
+      throw new Error("noslot");
+    }
+    if (!current || current.slot !== "agentic-rescue-config-v1") throw new Error("noslot");
+    let version = null;
+    const ver = entries.find((e) => !e.dir && e.name === "VERSION.TXT");
+    if (ver && ver.size < 256) version = new TextDecoder().decode(await bytes(file, ver.lba * SECTOR, ver.lba * SECTOR + ver.size)).trim();
+    return { offset, length: entry.size, current, version };
+  }
+
+  function patchedBlob(file, slot, config) {
+    const payload = encodeSlot(config, slot.length);
+    return new Blob([file.slice(0, slot.offset), payload, file.slice(slot.offset + slot.length)], { type: "application/octet-stream" });
+  }
+
+  // Must be called from a click handler: the save dialog needs user activation.
+  async function saveBlob(blob, filename, onProgress) {
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: "Disc image", accept: { "application/x-iso9660-image": [".iso"] } }] });
+      const writable = await handle.createWritable();
+      await blob.stream().pipeThrough(progressTap(onProgress)).pipeTo(writable);
+      return "fs";
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+    onProgress(blob.size);
+    return "blob";
+  }
+
+  window.RescuePatch = { downloadPatched, encodeSlot, Sha256, SLOT_MAGIC, inspectIso, patchedBlob, saveBlob };
 })();

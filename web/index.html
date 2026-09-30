@@ -3,89 +3,218 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agentic Rescue</title>
-<meta name="description" content="A rescue stick with an AI agent inside. Boot, mount, repair. Your API key is written into the image while it downloads, in your browser.">
+<title>Agentic Rescue · 2342.ai</title>
+<meta name="description" content="A NixOS rescue stick with opencode, Claude Code and Codex inside. Pick a provider, download, boot, repair. One 2342.ai key drives all three agents.">
+<meta name="theme-color" content="#070a18">
+<link rel="canonical" href="https://rescue.2342.ai/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="2342.ai">
+<meta property="og:url" content="https://rescue.2342.ai/">
+<meta property="og:title" content="Agentic Rescue: a rescue stick with an AI agent inside">
+<meta property="og:description" content="NixOS live system with opencode, Claude Code and Codex. Your key goes into the image before it ever boots. Mount, diagnose, repair.">
+<meta property="og:image" content="https://rescue.2342.ai/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Agentic Rescue by 2342.ai: terminal with an agent diagnosing a broken boot">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Agentic Rescue: a rescue stick with an AI agent inside">
+<meta name="twitter:description" content="NixOS live system with opencode, Claude Code and Codex. Mount, diagnose, repair.">
+<meta name="twitter:image" content="https://rescue.2342.ai/og.png">
+<link rel="icon" href="assets/2342-rocket.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
 </head>
 <body>
-<header>
-  <div class="brand"><span class="dot"></span> Agentic Rescue</div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fb0ff"/><stop offset="1" stop-color="#b06dff"/></linearGradient>
+  </defs>
+</svg>
+<div class="glow" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="brand">
+    <a href="https://2342.ai" class="logo" rel="noopener"><img src="assets/2342-rocket.svg" alt="" width="30" height="30"><span>2342.ai</span></a>
+    <span class="slash">/</span>
+    <a href="#" class="product">Rescue</a>
+  </div>
   <nav>
+    <a href="#download" data-i18n="nav.download">Download</a>
     <a href="#how" data-i18n="nav.how">How it works</a>
-    <a href="#build" data-i18n="nav.build">Build it yourself</a>
-    <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
+    <a href="#build" data-i18n="nav.build">Build</a>
+    <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener" class="gh" aria-label="GitHub"><svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
     <button class="lang" id="lang" aria-label="Language">DE</button>
   </nav>
 </header>
 
 <main>
   <section class="hero">
-    <h1 data-i18n="hero.title">A rescue stick with an agent inside.</h1>
-    <p class="lead" data-i18n="hero.lead">NixOS live system. opencode, Claude Code and Codex ready at the console. Your API key goes into the image while it downloads, in your browser, so the stick works the moment it boots.</p>
-  </section>
-
-  <section class="card" id="download">
-    <h2 data-i18n="dl.title">Download</h2>
-
-    <div class="field">
-      <label data-i18n="dl.provider">AI provider</label>
-      <div class="providers" id="providers"></div>
-    </div>
-
-    <div class="field">
-      <label for="key" data-i18n="dl.key">API key</label>
-      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="…">
-      <p class="hint" id="key-hint"></p>
-    </div>
-
-    <details class="more">
-      <summary data-i18n="dl.more">Wi-Fi, SSH, keyboard (optional)</summary>
-      <div class="grid">
-        <div class="field"><label for="wifi-ssid">Wi-Fi SSID</label><input id="wifi-ssid" autocomplete="off"></div>
-        <div class="field"><label for="wifi-psk" data-i18n="dl.wifipsk">Wi-Fi password</label><input id="wifi-psk" type="password" autocomplete="off"></div>
-        <div class="field"><label for="keymap" data-i18n="dl.keymap">Keyboard layout</label>
-          <select id="keymap"><option value="us">us</option><option value="de">de</option><option value="de-latin1-nodeadkeys">de (no dead keys)</option><option value="uk">uk</option><option value="fr">fr</option><option value="es">es</option><option value="it">it</option><option value="ch">ch</option><option value="dvorak">dvorak</option></select></div>
-        <div class="field"><label for="name" data-i18n="dl.name">Name on the console</label><input id="name" autocomplete="off" placeholder="Franz' rescue stick"></div>
-        <div class="field wide"><label for="sshkey" data-i18n="dl.ssh">SSH public key (root login)</label><textarea id="sshkey" rows="2" spellcheck="false" placeholder="ssh-ed25519 AAAA…"></textarea></div>
-        <div class="field wide"><label for="model" data-i18n="dl.model">Default model (provider/model)</label><input id="model" autocomplete="off"></div>
+    <div class="hero-text">
+      <p class="eyebrow" data-i18n="hero.eyebrow">NixOS live system · opencode · Claude Code · Codex</p>
+      <h1 data-i18n-html="hero.title">A rescue stick<br>with an <em>agent</em> inside.</h1>
+      <p class="lead" data-i18n="hero.lead">Boot it on the machine that will not start. The agent mounts the installed system read-only, reads the logs with you and asks before it changes anything. Your key goes into the image before it ever boots.</p>
+      <div class="cta">
+        <a class="btn primary" href="#download"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg><span data-i18n="hero.cta">Get the ISO</span></a>
+        <a class="btn ghost" href="https://github.com/2342-ai/agentic-rescue" rel="noopener" data-i18n="hero.source">Source on GitHub</a>
       </div>
-    </details>
-
-    <div class="variants" id="variants"></div>
-
-    <button class="primary" id="go" data-i18n="dl.go">Download ISO with my key</button>
-    <button class="secondary" id="plain" data-i18n="dl.plain">Download unconfigured ISO</button>
-
-    <div class="progress" id="progress" hidden>
-      <div class="bar"><div id="bar"></div></div>
-      <p id="status"></p>
+      <p class="meta" id="hero-meta">x86_64 · UEFI + BIOS · MIT</p>
     </div>
 
-    <div class="manual" id="manual" hidden>
-      <p data-i18n="man.intro">The image is downloading from GitHub and your configuration was saved as <code>rescue-config.json</code>. GitHub does not let the browser rewrite the image, so run one of these in the folder with both files:</p>
-      <pre><code id="man-nix"></code></pre>
-      <pre><code id="man-py"></code></pre>
-      <p class="hint" data-i18n="man.note">Both write the configuration into the image in place. Then write it to a stick as usual.</p>
+    <div class="terminal" aria-hidden="true">
+      <div class="term-bar"><span></span><span></span><span></span><em>root@rescue</em></div>
+      <pre class="term-body"><span class="p">~ ›</span> rescue-mount
+<span class="d">  Encrypted volume /dev/nvme0n1p2. Type its passphrase.</span>
+<span class="d">  Mounted</span> btrfs @ <span class="d">at</span> /mnt<span class="d">, read-only.</span>
+<span class="p">~ ›</span> opencode
+<span class="u">› It hangs at boot since yesterday's update.</span>
+<span class="a">●</span> Reading /mnt/var/log/pacman.log and the
+  journal of the last boot…
+<span class="a">●</span> linux 6.18 was installed, but mkinitcpio
+  failed: <span class="w">no space left on /boot</span>.
+<span class="a">●</span> Proposed fix, needs your yes:
+  <span class="c">rescue-mount --rw</span>
+  <span class="c">arch-chroot /mnt mkinitcpio -P</span> <span class="k">[ask]</span></pre>
+      <div class="term-status"><b>RESCUE</b><span>1 opencode</span><i>Home 192.168.1.20 │ 2342ai/claude-sonnet │ /mnt ro</i></div>
     </div>
-
-    <p class="fine" id="fine" data-i18n="dl.fine">The key never leaves your browser. The page streams the image from the download server, replaces one 16 KiB block in place and hands the result to your disk. The original image's checksum is verified while it streams.</p>
   </section>
 
-  <section id="how" class="text">
-    <h2 data-i18n="how.title">How it works</h2>
+  <section class="features">
+    <article>
+      <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>
+      <h3 data-i18n="f1.t">Three agents, one console</h3>
+      <p data-i18n="f1.p">opencode, Claude Code and Codex are installed and briefed: where they are, how installed systems look from the outside, and the rules.</p>
+    </article>
+    <article>
+      <svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg>
+      <h3 data-i18n="f2.t">One key for all three</h3>
+      <p data-i18n="f2.p">2342.ai speaks the OpenAI, Responses and Anthropic formats. Groq, Google AI Studio and OpenRouter work too, with free tiers.</p>
+    </article>
+    <article>
+      <svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 15v4h14v-4"/></svg>
+      <h3 data-i18n="f3.t">Configured before first boot</h3>
+      <p data-i18n="f3.p">Key, Wi-Fi, SSH key and keyboard layout go into a 16 KiB slot in the image, right here in your browser. Nothing is sent anywhere.</p>
+    </article>
+    <article>
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></svg>
+      <h3 data-i18n="f4.t">Every filesystem</h3>
+      <p data-i18n="f4.p">ZFS, Btrfs, ext4, XFS, NTFS, LUKS, LVM, mdadm. rescue-mount finds the installed system and mounts it read-only first.</p>
+    </article>
+    <article>
+      <svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+      <h3 data-i18n="f5.t">Your phone as second screen</h3>
+      <p data-i18n="f5.p">Enter a key or finish a Claude or Codex sign-in by scanning a QR code. Follow the console in your phone's browser.</p>
+    </article>
+    <article>
+      <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+      <h3 data-i18n="f6.t">Careful by default</h3>
+      <p data-i18n="f6.p">Read-only first. Destructive commands only after an explicit yes. A backup of every file before it is edited.</p>
+    </article>
+  </section>
+
+  <section class="download" id="download">
+    <div class="section-head">
+      <h2 data-i18n="dl.title">Get your rescue stick</h2>
+      <p data-i18n="dl.sub">Three steps. Your key stays in this browser tab and in the file you save.</p>
+    </div>
+
+    <div class="step" id="step1">
+      <div class="num">1</div>
+      <div class="step-body">
+        <h3 data-i18n="s1.t">Choose an AI provider</h3>
+        <div class="providers" id="providers"></div>
+        <label for="key" data-i18n="s1.key">API key</label>
+        <div class="keyrow">
+          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="…">
+          <button type="button" class="eye" id="eye" aria-label="Show key">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p class="hint" id="key-hint"></p>
+        <details class="more">
+          <summary data-i18n="s1.more">Wi-Fi, SSH, keyboard (optional)</summary>
+          <div class="grid">
+            <div><label for="wifi-ssid">Wi-Fi SSID</label><input id="wifi-ssid" autocomplete="off"></div>
+            <div><label for="wifi-psk" data-i18n="s1.wifipsk">Wi-Fi password</label><input id="wifi-psk" type="password" autocomplete="off"></div>
+            <div><label for="keymap" data-i18n="s1.keymap">Keyboard layout</label>
+              <select id="keymap"><option value="us">us</option><option value="de">de</option><option value="de-latin1-nodeadkeys">de (no dead keys)</option><option value="uk">uk</option><option value="fr">fr</option><option value="es">es</option><option value="it">it</option><option value="ch">ch</option><option value="dvorak">dvorak</option></select></div>
+            <div><label for="name" data-i18n="s1.name">Name on the console</label><input id="name" autocomplete="off"></div>
+            <div class="wide"><label for="sshkey" data-i18n="s1.ssh">SSH public key (root login)</label><textarea id="sshkey" rows="2" spellcheck="false" placeholder="ssh-ed25519 AAAA…"></textarea></div>
+            <div class="wide"><label for="model" data-i18n="s1.model">Default model (provider/model)</label><input id="model" autocomplete="off"></div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="step" id="step2">
+      <div class="num">2</div>
+      <div class="step-body">
+        <h3 data-i18n="s2.t">Download the image</h3>
+        <div class="variants" id="variants"></div>
+        <button class="btn primary big" id="go"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg><span id="go-label" data-i18n="s2.go">Download ISO</span></button>
+        <div class="dlstate" id="dlstate" hidden>
+          <div class="bar"><div id="bar"></div></div>
+          <div class="dlinfo"><span class="spinner" id="spinner"></span><p id="status"></p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step" id="step3">
+      <div class="num">3</div>
+      <div class="step-body">
+        <h3 data-i18n="s3.t">Write your settings into the image</h3>
+        <p class="hint" data-i18n="s3.p">When the download has finished, drop the ISO here. The page finds the configuration slot and saves a copy with your key inside. Takes seconds, nothing is uploaded.</p>
+        <label class="drop" id="drop" for="isofile">
+          <input type="file" id="isofile" accept=".iso,application/x-iso9660-image" hidden>
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="url(#g)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+          <span id="drop-label" data-i18n="s3.drop">Drop the downloaded ISO here, or click to choose it</span>
+        </label>
+        <div class="found" id="found" hidden>
+          <p id="found-text"></p>
+          <button class="btn primary" id="save"><span data-i18n="s3.save">Save configured ISO</span></button>
+          <div class="bar thin" id="save-bar-wrap" hidden><div id="save-bar"></div></div>
+          <p class="hint" id="save-status"></p>
+        </div>
+        <details class="more cli">
+          <summary data-i18n="s3.cli">Prefer the command line?</summary>
+          <pre><code id="cli"></code></pre>
+        </details>
+      </div>
+    </div>
+
+    <p class="fine" data-i18n="dl.fine">Then write the ISO to a USB stick with dd, balenaEtcher, Rufus or Ventoy, and boot it. Whoever holds the stick holds the key: create a key just for the stick and give it a budget.</p>
+  </section>
+
+  <section class="how" id="how">
+    <h2 data-i18n="how.title">What happens at boot</h2>
     <ol>
-      <li data-i18n="how.1">Write the ISO to a USB stick with dd, Etcher or Ventoy. Any method works, the key sits in a normal file inside the image.</li>
-      <li data-i18n="how.2">Boot. You land in a console with a menu. If you entered Wi-Fi, the stick is already online.</li>
-      <li data-i18n="how.3">rescue-mount finds the installed system, unlocks it and mounts it read-only. Then talk to opencode, Claude Code or Codex about what is wrong.</li>
-      <li data-i18n="how.4">No key? Press C-Space k and enter one from your phone via QR code, or sign in to Claude or Codex with your subscription the same way.</li>
+      <li><b data-i18n="how.1t">Console, not desktop.</b> <span data-i18n="how.1">kmscon with a real font and truecolor, tmux underneath, a menu on top. A second boot entry without modesetting for difficult GPUs.</span></li>
+      <li><b data-i18n="how.2t">Your settings apply.</b> <span data-i18n="how.2">Keys become environment variables and agent configuration, Wi-Fi connects, your SSH key is authorized.</span></li>
+      <li><b data-i18n="how.3t">Find the patient.</b> <span data-i18n="how.3">rescue-mount unlocks LUKS, assembles LVM and RAID, imports ZFS pools and mounts the installed system read-only at /mnt.</span></li>
+      <li><b data-i18n="how.4t">Talk it through.</b> <span data-i18n="how.4">opencode, claude or codex. The agent reads logs, explains, proposes. Repairs run in a chroot, after your yes.</span></li>
     </ol>
-    <p data-i18n="how.p">Read-only first, destructive commands only after an explicit yes, backups before edits: the agents carry these rules as their instructions.</p>
+    <p class="hint" data-i18n="how.nokey">No key in the image? Press C-Space k at the console and type it on your phone via QR code. Claude and Codex subscribers sign in the same way.</p>
   </section>
 
-  <section id="build" class="text">
+  <section class="providers-table">
+    <h2 data-i18n="pt.title">Providers</h2>
+    <div class="table">
+      <div class="row head"><span data-i18n="pt.provider">Provider</span><span>opencode</span><span>Claude Code</span><span>Codex</span><span data-i18n="pt.free">Free tier</span></div>
+      <div class="row star"><span><b>2342.ai</b> <small data-i18n="pt.rec">recommended</small></span><span class="y">●</span><span class="y">●</span><span class="y">●</span><span>–</span></div>
+      <div class="row"><span>Groq</span><span class="y">●</span><span></span><span></span><span class="y">●</span></div>
+      <div class="row"><span>Google AI Studio</span><span class="y">●</span><span></span><span></span><span class="y">●</span></div>
+      <div class="row"><span>OpenRouter</span><span class="y">●</span><span></span><span></span><span class="y">●</span></div>
+      <div class="row"><span>OpenCode Zen</span><span class="y">●</span><span></span><span></span><span class="y">●</span></div>
+      <div class="row"><span>Anthropic</span><span class="y">●</span><span class="y">●</span><span></span><span>–</span></div>
+      <div class="row"><span>OpenAI</span><span class="y">●</span><span></span><span class="y">●</span><span>–</span></div>
+    </div>
+    <p class="hint" data-i18n="pt.note">Claude Code and Codex also accept their own subscription sign-in at the console.</p>
+  </section>
+
+  <section class="build" id="build">
     <h2 data-i18n="build.title">Build it yourself</h2>
-    <p data-i18n="build.p">The whole system is one Nix flake. Build the image, patch a slot, or bake your configuration in at build time.</p>
+    <p data-i18n="build.p">One Nix flake. Build the image, patch the slot, or bake your configuration in at build time.</p>
 <pre><code>nix build github:2342-ai/agentic-rescue#iso
 nix run github:2342-ai/agentic-rescue#patch -- result/iso/*.iso \
   --provider groq --key gsk_… --wifi "Home" "secret" -o my-rescue.iso</code></pre>
@@ -93,11 +222,13 @@ nix run github:2342-ai/agentic-rescue#patch -- result/iso/*.iso \
 </main>
 
 <footer>
-  <span>Agentic Rescue</span>
-  <a href="https://2342.ai" rel="noopener">2342.ai</a>
-  <a href="https://anycast.io" rel="noopener">anycast.io</a>
-  <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
-  <span id="version"></span>
+  <div class="foot-brand"><img src="assets/2342-rocket.svg" alt="" width="22" height="22"><span>Agentic Rescue is made by <a href="https://2342.ai" rel="noopener">2342.ai</a> and <a href="https://anycast.io" rel="noopener">anycast.io</a></span></div>
+  <div class="foot-links">
+    <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
+    <a href="https://github.com/2342-ai/agentic-rescue/releases" rel="noopener" data-i18n="foot.releases">Releases</a>
+    <a href="https://2342.ai/en/imprint" rel="noopener" data-i18n="foot.imprint">Imprint</a>
+    <span id="version"></span>
+  </div>
 </footer>
 
 <script src="config.js"></script>

@@ -6,6 +6,7 @@
   patch-iso,
   xorriso,
   jq,
+  nodejs,
 }:
 runCommand "check-slot-patch"
   {
@@ -13,6 +14,7 @@ runCommand "check-slot-patch"
       patch-iso
       xorriso
       jq
+      nodejs
     ];
   }
   ''
@@ -34,6 +36,12 @@ runCommand "check-slot-patch"
     offset=$(jq -r .configOffset ${release}/release.json)
     cmp -n "$offset" "$iso" $TMPDIR/test.iso
     cmp -i "$((offset + 16384))" "$iso" $TMPDIR/test.iso
+
+    # The download page's in-browser path (web/patch.js) on the same image.
+    PATCH_JS=${../web/patch.js} node ${../tests/web-patch.mjs} "$iso" $TMPDIR/web.iso
+    agentic-rescue-patch $TMPDIR/web.iso --extract | jq -e '.providers.groq.key == "gsk_webtest" and .keymap == "de" and .slot == "agentic-rescue-config-v1"'
+    cmp -n "$offset" "$iso" $TMPDIR/web.iso
+    cmp -i "$((offset + 16384))" "$iso" $TMPDIR/web.iso
 
     touch $out
   ''

@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Source of og.png. Render: rsvg-convert -w 1200 -h 630 og.svg -o og.png
+       (needs Instrument Sans, Instrument Serif and JetBrains Mono installed) -->
+  <defs>
+    <radialGradient id="glow1" cx="0.08" cy="-0.05" r="0.75">
+      <stop offset="0" stop-color="#2fb0ff" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#2fb0ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="1.02" cy="1.05" r="0.8">
+      <stop offset="0" stop-color="#9300ff" stop-opacity=".32"/>
+      <stop offset="1" stop-color="#9300ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2fb0ff"/>
+      <stop offset="1" stop-color="#b06dff"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2fb0ff" stop-opacity=".7"/>
+      <stop offset=".45" stop-color="#f2ede4" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#b06dff" stop-opacity=".7"/>
+    </linearGradient>
+    <linearGradient id="term" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c182c"/>
+      <stop offset="1" stop-color="#08101f"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22"/>
+      <feOffset dy="18"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".55"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#070a18"/>
+  <rect width="1200" height="630" fill="url(#glow1)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+
+  <!-- brand -->
+  <image xlink:href="assets/2342-rocket.svg" href="assets/2342-rocket.svg" x="62" y="50" width="46" height="46"/>
+  <text x="120" y="83" font-family="Instrument Sans" font-weight="600" font-size="27" fill="#f2ede4">2342.ai</text>
+  <text x="222" y="83" font-family="Instrument Sans" font-size="27" fill="#f2ede4" fill-opacity=".3">/</text>
+  <text x="240" y="83" font-family="Instrument Sans" font-weight="600" font-size="27" fill="url(#brand)">Rescue</text>
+
+  <!-- headline -->
+  <text x="64" y="186" font-family="Instrument Sans" font-weight="600" font-size="17" letter-spacing="3" fill="#f2ede4" fill-opacity=".6">AGENTIC RESCUE · NIXOS LIVE SYSTEM</text>
+  <text x="62" y="268" font-family="Instrument Serif" font-size="74" fill="#f2ede4">A rescue stick</text>
+  <text x="62" y="346" font-family="Instrument Serif" font-size="74" fill="#f2ede4" xml:space="preserve">with an <tspan font-style="italic" fill="url(#brand)">agent</tspan> inside.</text>
+  <text x="64" y="404" font-family="Instrument Sans" font-size="22" fill="#f2ede4" fill-opacity=".68">Boot it, mount read-only, diagnose, repair.</text>
+  <text x="64" y="436" font-family="Instrument Sans" font-size="22" fill="#f2ede4" fill-opacity=".68">Your key is in the image before it boots.</text>
+
+  <!-- agent chips -->
+  <g font-family="Instrument Sans" font-weight="600" font-size="17" fill="#f2ede4">
+    <rect x="64" y="476" width="112" height="38" rx="19" fill="#f2ede4" fill-opacity=".06" stroke="#f2ede4" stroke-opacity=".18"/>
+    <text x="120" y="501" text-anchor="middle">opencode</text>
+    <rect x="186" y="476" width="136" height="38" rx="19" fill="#f2ede4" fill-opacity=".06" stroke="#f2ede4" stroke-opacity=".18"/>
+    <text x="254" y="501" text-anchor="middle">Claude Code</text>
+    <rect x="332" y="476" width="88" height="38" rx="19" fill="#f2ede4" fill-opacity=".06" stroke="#f2ede4" stroke-opacity=".18"/>
+    <text x="376" y="501" text-anchor="middle">Codex</text>
+    <rect x="430" y="476" width="92" height="38" rx="19" fill="#f2ede4" fill-opacity=".06" stroke="#f2ede4" stroke-opacity=".18"/>
+    <text x="476" y="501" text-anchor="middle">NixOS</text>
+  </g>
+
+  <text x="64" y="578" font-family="Instrument Sans" font-weight="600" font-size="26" fill="url(#brand)">rescue.2342.ai</text>
+
+  <!-- terminal -->
+  <g filter="url(#shadow)">
+    <rect x="634" y="112" width="508" height="424" rx="20" fill="url(#term)"/>
+  </g>
+  <rect x="634.5" y="112.5" width="507" height="423" rx="19.5" fill="none" stroke="url(#edge)"/>
+  <circle cx="662" cy="140" r="6" fill="#2a3550"/>
+  <circle cx="682" cy="140" r="6" fill="#2a3550"/>
+  <circle cx="702" cy="140" r="6" fill="#2a3550"/>
+  <text x="724" y="145" font-family="JetBrains Mono" font-size="13" fill="#f2ede4" fill-opacity=".4">root@rescue</text>
+  <line x1="635" y1="162" x2="1141" y2="162" stroke="#f2ede4" stroke-opacity=".08"/>
+
+  <g font-family="JetBrains Mono" font-size="16.5" fill="#d7dcf2" xml:space="preserve">
+    <text x="660" y="200"><tspan fill="#7dd3fc">~ ›</tspan> rescue-mount</text>
+    <text x="660" y="227" fill="#7c86a8">  unlocked nvme0n1p2 (LUKS2)</text>
+    <text x="660" y="254"><tspan fill="#7c86a8">  mounted </tspan>btrfs @<tspan fill="#7c86a8"> at </tspan>/mnt<tspan fill="#7c86a8">, ro</tspan></text>
+    <text x="660" y="290"><tspan fill="#7dd3fc">~ ›</tspan> opencode</text>
+    <text x="660" y="317" fill="#f2ede4">› It hangs at boot since the update.</text>
+    <text x="660" y="350"><tspan fill="#b06dff">●</tspan> mkinitcpio failed after linux 6.18:</text>
+    <text x="660" y="377" fill="#ff9eb0">  no space left on /boot</text>
+    <text x="660" y="410"><tspan fill="#b06dff">●</tspan> Proposed fix, needs your yes:</text>
+    <text x="660" y="437" fill="#9ae6b4">  arch-chroot /mnt mkinitcpio -P <tspan fill="#f0c27a">[ask]</tspan></text>
+  </g>
+
+  <rect x="635" y="490" width="506" height="45" fill="#070d1a"/>
+  <path d="M635 490h506v25.5a19.5 19.5 0 0 1-19.5 19.5h-467a19.5 19.5 0 0 1-19.5-19.5z" fill="#070d1a"/>
+  <line x1="635" y1="490" x2="1141" y2="490" stroke="#f2ede4" stroke-opacity=".08"/>
+  <rect x="652" y="501" width="80" height="22" rx="5" fill="url(#brand)"/>
+  <text x="692" y="517" text-anchor="middle" font-family="JetBrains Mono" font-weight="700" font-size="13" fill="#070a18">RESCUE</text>
+  <text x="746" y="517" font-family="JetBrains Mono" font-size="13" fill="#c0caf5">1 opencode</text>
+  <text x="1124" y="517" text-anchor="end" font-family="JetBrains Mono" font-size="13" fill="#7aa2f7">2342ai/claude-sonnet │ /mnt ro</text>
+</svg>

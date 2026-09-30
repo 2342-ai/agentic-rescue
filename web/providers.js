@@ -1,6 +1,6 @@
 // Same table as PROVIDERS in pkgs/rescue-cli/bin/rescue-config, for the page.
 window.PROVIDERS = [
-  { id: "2342ai", label: "2342.ai", env: "AI2342_API_KEY", url: "https://2342.ai", tags: ["rec", "all"],
+  { id: "2342ai", label: "2342.ai", url: "https://2342.ai", tags: ["rec", "all"],
     placeholder: "2342.ai API key", model: "2342ai/claude-sonnet-4-5" },
   { id: "groq", label: "Groq", url: "https://console.groq.com/keys", tags: ["free"],
     placeholder: "gsk_…", model: "groq/openai/gpt-oss-120b" },
