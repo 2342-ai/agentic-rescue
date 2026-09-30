@@ -1,0 +1,22 @@
+{
+  "v": 1,
+  "slot": "agentic-rescue-config-v1",
+  "providers": {
+    "2342ai": { "key": "your-2342.ai-key" },
+    "groq": { "key": "gsk_..." }
+  },
+  "agent": "opencode",
+  "model": "2342ai/claude-sonnet-4-5",
+  "claude_model": "claude-sonnet-4-5",
+  "codex_model": "gpt-5.3-codex",
+  "wifi": [
+    { "ssid": "Home", "psk": "wifi-password" },
+    { "ssid": "Cafe Guest" }
+  ],
+  "ssh_authorized_keys": [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... you@laptop"
+  ],
+  "tailscale_authkey": null,
+  "keymap": "de",
+  "name": "Franz' rescue stick"
+}

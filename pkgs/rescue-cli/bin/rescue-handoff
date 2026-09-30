@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""rescue-handoff: hand something to a phone on the local network via a QR code.
+
+  rescue-handoff link [--pane ID]   take the last link on screen (an agent's sign-in
+                                    link), show a QR code for a one-time page that opens
+                                    it on the phone and can paste a code back into the pane
+  rescue-handoff key                one-time page where the phone enters a provider API
+                                    key; the key is stored with rescue-config and applied
+
+The page lives at http://<lan-ip>:7682/<random>/ and stops after one use or when
+this program exits. Without a network address the link itself becomes the QR code.
+"""
+
+import html
+import json
+import os
+import re
+import secrets
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs
+
+PORT = 7682
+URL_RE = re.compile(r"https?://[^\s\"'<>│┃|]+")
+CODE_RE = re.compile(r"\b[A-Z0-9]{4}-[A-Z0-9]{4,6}\b")
+
+CSS = """
+body{margin:0;padding:24px;background:#1a1b26;color:#c0caf5;font:17px/1.5 system-ui,sans-serif}
+h1{font-size:20px;color:#7aa2f7;margin:0 0 20px}
+a.b,button{display:block;box-sizing:border-box;width:100%;padding:14px;border:0;border-radius:10px;
+ background:#7aa2f7;color:#1a1b26;font:600 17px system-ui,sans-serif;text-align:center;text-decoration:none}
+input,textarea,select{box-sizing:border-box;width:100%;margin:8px 0 12px;padding:12px;border-radius:10px;
+ border:1px solid #414868;background:#16161e;color:#c0caf5;font:15px ui-monospace,monospace}
+textarea{height:110px}.s{margin:26px 0 0;color:#a9b1d6}.l{margin-top:8px;font:12px ui-monospace,monospace;color:#565f89;word-break:break-all}
+.c{margin:8px 0 0;padding:14px;border-radius:10px;border:1px solid #414868;background:#16161e;color:#9ece6a;
+ font:600 28px ui-monospace,monospace;text-align:center;letter-spacing:.06em;user-select:all}
+.ok{color:#9ece6a}
+"""
+
+
+def page(title, body):
+    return (
+        '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>Agentic Rescue</title><style>{CSS}</style></head>"
+        f"<body><h1>{html.escape(title)}</h1>{body}</body></html>"
+    )
+
+
+def tmux(*args):
+    return subprocess.run(["tmux", *args], check=True, capture_output=True, text=True).stdout
+
+
+def pane_text(pane):
+    return tmux("capture-pane", "-p", "-J", "-S", "-2000", "-t", pane)
+
+
+def lan_address():
+    out = subprocess.run(["ip", "-4", "route", "get", "1.1.1.1"], capture_output=True, text=True).stdout.split()
+    if "src" in out:
+        return out[out.index("src") + 1]
+    out = subprocess.run(["ip", "-4", "-o", "addr", "show", "scope", "global"], capture_output=True, text=True).stdout
+    m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", out)
+    return m.group(1) if m else None
+
+
+def qr(text):
+    return subprocess.run(["qrencode", "-t", "ansiutf8", "-m", "1", "-l", "L", text],
+                          check=True, capture_output=True, text=True).stdout
+
+
+def show_qr(url, hint):
+    image = qr(url)
+    cols, rows = shutil.get_terminal_size()
+    lines = image.splitlines()
+    width = len(re.sub(r"\x1b\[[0-9;]*m", "", lines[0])) if lines else 0
+    if width > cols or len(lines) + 3 > rows:
+        print("The QR code does not fit this window. Open the address by hand:\n")
+    else:
+        print(image, end="")
+    print(f"\n{hint}\n\033[2m{url}\033[0m")
+
+
+def serve(handler_cls):
+    server = HTTPServer(("0.0.0.0", PORT), handler_cls)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+class Quiet(BaseHTTPRequestHandler):
+    token = ""
+
+    def log_message(self, *args):
+        pass
+
+    def reply(self, status, body):
+        data = body.encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def authorized(self):
+        return self.path == f"/{self.token}/"
+
+    def form(self, limit=65536):
+        length = min(int(self.headers.get("Content-Length") or 0), limit)
+        return parse_qs(self.rfile.read(length).decode())
+
+
+def finish(delay=0.6):
+    threading.Timer(delay, lambda: os._exit(0)).start()
+
+
+# ----------------------------------------------------------------------------- link
+
+def device_code(text, link):
+    after = text.rsplit(link, 1)[-1].splitlines()[:12]
+    for i, line in enumerate(after):
+        found = CODE_RE.search(line)
+        if found and re.search("code", " ".join(after[max(0, i - 2): i + 1]), re.I):
+            return found.group()
+    return None
+
+
+def cmd_link(pane):
+    text = pane_text(pane)
+    links = URL_RE.findall(text)
+    if not links:
+        print("No link on screen yet. Start the agent's sign-in first, then press C-Space u again.")
+        input("\nEnter to close.")
+        return 1
+    link = links[-1].rstrip(".,;:)]}")
+    code = device_code(text, link)
+    pastes_back = not code and "user_code=" not in link
+    address = lan_address()
+    token = secrets.token_hex(12)
+
+    open_html = f'<a class="b" href="{html.escape(link, True)}" target="_blank" rel="noopener">Open sign-in link</a><div class="l">{html.escape(link)}</div>'
+    if pastes_back:
+        body = (f'<p class="s">1. Open the link and sign in.</p>{open_html}'
+                '<form method="post"><p class="s">2. If it gives you a code to paste back, send it here.</p>'
+                '<textarea name="code" placeholder="Paste the code" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>'
+                '<button type="submit">Send to the rescue console</button></form>')
+    elif code and code in link:
+        body = f'<p class="s">1. The page will show this code. Approve only if it matches.</p><div class="c">{code}</div><p class="s">2. Open the link and approve.</p>{open_html}'
+    elif code:
+        body = f'<p class="s">1. The page will ask for this code.</p><div class="c">{code}</div><p class="s">2. Open the link, sign in, enter the code.</p>{open_html}'
+    else:
+        body = f'<p class="s">Open the link and approve the sign-in. Nothing to paste back.</p>{open_html}'
+
+    class Handler(Quiet):
+        def do_GET(self):
+            if not self.authorized():
+                return self.reply(404, "Not found")
+            self.reply(200, page("Agentic Rescue sign-in", body))
+
+        def do_POST(self):
+            if not self.authorized() or not pastes_back:
+                return self.reply(404, "Not found")
+            pasted = self.form().get("code", [""])[0]
+            pasted = "".join(ch for ch in pasted if ch.isprintable()).strip()
+            if not pasted:
+                return self.reply(400, page("Agentic Rescue sign-in", body))
+            tmux("send-keys", "-t", pane, "-l", pasted)
+            tmux("display-message", "-d", "15000", "Code received from your phone. Press Enter to use it.")
+            self.reply(200, page("Sent", '<p class="ok">The code is waiting at the console prompt. Press Enter there.</p>'))
+            finish()
+
+    Handler.token = token
+
+    if address:
+        try:
+            serve(Handler)
+        except OSError:
+            address = None
+
+    if not pastes_back:
+        # Close once the agent prints something new, which means the sign-in went through.
+        def watch():
+            settled = len([l for l in pane_text(pane).splitlines() if l.strip()])
+            quiet = 0
+            while True:
+                time.sleep(1)
+                now = len([l for l in pane_text(pane).splitlines() if l.strip()])
+                if quiet < 3:
+                    quiet = quiet + 1 if now == settled else 0
+                    settled = now
+                elif now > settled:
+                    os._exit(0)
+        threading.Thread(target=watch, daemon=True).start()
+
+    if address:
+        show_qr(f"http://{address}:{PORT}/{token}/",
+                "Scan with your phone (same network). " + ("Paste the code back on the page." if pastes_back else "Approve the sign-in there."))
+        if code:
+            print(f"\nCode: \033[1m{code}\033[0m")
+    else:
+        if code:
+            print(f"Code: \033[1m{code}\033[0m\n")
+        show_qr(link, "No network. This QR code is the sign-in link itself.")
+    input("\nEnter to close.")
+    return 0
+
+
+# ----------------------------------------------------------------------------- key
+
+def cmd_key():
+    providers = json.loads(subprocess.run(["rescue-config", "providers"], check=True, capture_output=True, text=True).stdout)
+    address = lan_address()
+    if not address:
+        print("No network address yet. Connect Wi-Fi first (C-Space w), then try again.")
+        input("\nEnter to close.")
+        return 1
+    token = secrets.token_hex(12)
+    options = "".join(
+        f'<option value="{pid}">{html.escape(spec["label"])}{" (free tier)" if spec.get("free") else ""}</option>'
+        for pid, spec in providers.items()
+    )
+    persist_box = ('<label><input type="checkbox" name="persist" value="1" style="width:auto;margin-right:8px">Save on the stick (RESCUE_DATA)</label>'
+                   if os.path.ismount("/persist") else "")
+    body = ('<form method="post"><p class="s">Provider</p><select name="provider">' + options + "</select>"
+            '<p class="s">API key</p><input name="key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste the key">'
+            f"{persist_box}<button type=\"submit\">Send to the rescue console</button></form>"
+            '<p class="l">The key is stored on the rescue system only. Nothing is sent anywhere else.</p>')
+
+    class Handler(Quiet):
+        def do_GET(self):
+            if not self.authorized():
+                return self.reply(404, "Not found")
+            self.reply(200, page("Connect an AI provider", body))
+
+        def do_POST(self):
+            if not self.authorized():
+                return self.reply(404, "Not found")
+            form = self.form()
+            pid = form.get("provider", [""])[0]
+            key = "".join(ch for ch in form.get("key", [""])[0] if ch.isprintable()).strip()
+            if pid not in providers or not key:
+                return self.reply(400, page("Connect an AI provider", body))
+            args = ["rescue-config", "set", f"providers.{pid}.key", key]
+            if form.get("persist"):
+                args.append("--persist")
+            subprocess.run(args, check=False)
+            self.reply(200, page("Connected", f'<p class="ok">{html.escape(providers[pid]["label"])} is configured. You can close this page.</p>'))
+            print(f"\n\033[1m{providers[pid]['label']}\033[0m key received and applied.")
+            finish(1.0)
+
+    Handler.token = token
+    serve(Handler)
+    show_qr(f"http://{address}:{PORT}/{token}/", "Scan with your phone (same network) and paste the API key there.")
+    input("\nEnter to cancel.")
+    return 0
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+        return 0
+    if argv[0] == "link":
+        pane = argv[argv.index("--pane") + 1] if "--pane" in argv else tmux("display-message", "-p", "#{pane_id}").strip()
+        return cmd_link(pane)
+    if argv[0] == "key":
+        return cmd_key()
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

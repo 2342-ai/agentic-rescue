@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# rescue-share: serve the shared tmux session in a browser on the local network.
+#   rescue-share [start|stop|status]
+# Plain HTTP with a random token in the path. Stop it when you are done.
+set -euo pipefail
+
+PORT=7681
+UNIT=agentic-rescue-share
+TOKEN_FILE=/run/agentic-rescue/share-token
+
+lan_address() {
+  ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src"){print $(i+1); exit}}'
+}
+
+case ${1:-start} in
+stop)
+  systemctl stop "$UNIT" 2>/dev/null || true
+  rm -f "$TOKEN_FILE"
+  echo "Stopped sharing."
+  exit 0
+  ;;
+status)
+  if systemctl is-active -q "$UNIT"; then
+    echo "sharing at http://$(lan_address):$PORT/$(<"$TOKEN_FILE")/"
+  else
+    echo "not sharing"
+  fi
+  exit 0
+  ;;
+start) ;;
+*)
+  echo "usage: rescue-share [start|stop|status]" >&2
+  exit 1
+  ;;
+esac
+
+address=$(lan_address || true)
+if [[ -z $address ]]; then
+  gum style --foreground 3 "No network yet. Connect Wi-Fi first (impala, or C-Space w)."
+  exit 1
+fi
+
+if ! systemctl is-active -q "$UNIT"; then
+  token=$(openssl rand -hex 12)
+  echo "$token" >"$TOKEN_FILE"
+  systemd-run --quiet --collect --unit="$UNIT" \
+    ttyd --port "$PORT" --base-path "/$token" --writable --check-origin --max-clients 3 \
+    --client-option titleFixed="Agentic Rescue" \
+    --client-option fontSize=14 \
+    --client-option disableLeaveAlert=true \
+    --client-option 'theme={"background":"#1a1b26","foreground":"#c0caf5","cursor":"#c0caf5"}' \
+    tmux new-session -A -s rescue
+fi
+
+url="http://$address:$PORT/$(<"$TOKEN_FILE")/"
+echo
+qrencode -t ansiutf8 -m 1 -l L "$url"
+echo
+gum style --foreground 4 "$url"
+echo "Anyone with this address controls a root shell. Run 'rescue-share stop' when done."

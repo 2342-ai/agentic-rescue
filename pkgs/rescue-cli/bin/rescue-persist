@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# rescue-persist: create the writable RESCUE_DATA partition on the boot stick.
+#
+# The ISO occupies the beginning of the stick; this adds an exFAT partition in
+# the free space behind it. rescue-config prefers /persist/rescue-config.json
+# over the ISO slot, so keys entered at runtime can be kept across reboots.
+#   rescue-persist            interactive, asks before writing
+#   rescue-persist --status
+set -euo pipefail
+
+say() { gum style --foreground 4 "$*"; }
+warn() { gum style --foreground 3 "$*"; }
+
+if [[ ${1:-} == --status ]]; then
+  if mountpoint -q /persist; then
+    findmnt /persist
+  else
+    echo "no RESCUE_DATA partition mounted"
+  fi
+  exit 0
+fi
+
+if mountpoint -q /persist; then
+  say "/persist is already mounted:"
+  findmnt /persist
+  exit 0
+fi
+
+iso_dev=$(findmnt -n -o SOURCE /iso || true)
+if [[ -z $iso_dev || $iso_dev == /dev/sr* || $iso_dev == /dev/loop* ]]; then
+  warn "The boot medium is not a USB stick ($iso_dev). Nothing to do."
+  exit 1
+fi
+disk=/dev/$(lsblk -no PKNAME "$iso_dev" | head -1)
+[[ -b $disk ]] || disk=$iso_dev
+
+size=$(blockdev --getsize64 "$disk")
+# Hybrid ISO images carry a GPT whose backup header sits at the image end, not
+# the stick end. Move it first so the free space behind the image is usable.
+sgdisk -e "$disk" >/dev/null 2>&1 || true
+free_start=$(sgdisk -f "$disk" 2>/dev/null || echo 0)
+free_bytes=$(( (size / 512 - free_start) * 512 ))
+
+echo
+echo "Boot stick:      $disk ($(numfmt --to=iec "$size"))"
+echo "Free after ISO:  $(numfmt --to=iec "$free_bytes")"
+echo
+if (( free_bytes < 64 * 1024 * 1024 )); then
+  warn "Less than 64 MiB free. Use a bigger stick."
+  exit 1
+fi
+warn "This writes a new partition table entry and formats the free space as exFAT."
+warn "The ISO partitions stay untouched, but there is no undo."
+gum confirm "Create RESCUE_DATA on $disk?" || exit 1
+
+sgdisk -n 0:0:0 -t 0:0700 -c 0:RESCUE_DATA "$disk"
+partprobe "$disk"
+udevadm settle
+part=$(lsblk -rpno NAME,PARTLABEL "$disk" | awk '$2=="RESCUE_DATA"{print $1}' | tail -1)
+[[ -b $part ]] || { warn "Partition not found after creation."; exit 1; }
+mkfs.exfat -L RESCUE_DATA "$part"
+mkdir -p /persist
+mount "$part" /persist
+say "RESCUE_DATA created at $part and mounted at /persist."
+echo "Keys added with 'rescue-connect' can now be saved to the stick."

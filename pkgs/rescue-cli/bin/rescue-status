@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# rescue-status: one line about network, provider and mount state.
+#   rescue-status          human readable
+#   rescue-status --tmux   coloured for the tmux status line
+#   rescue-status --json
+set -euo pipefail
+
+state=$(rescue-config state 2>/dev/null || echo '{}')
+providers=$(jq -r '(.providers // []) | join(",")' <<<"$state")
+model=$(jq -r '.model // ""' <<<"$state")
+inference=$(jq -r '.inference // false' <<<"$state")
+
+ssid=""
+if command -v iwctl >/dev/null; then
+  ssid=$(iwctl station list 2>/dev/null | awk '$NF=="connected"{print $1; exit}' || true)
+  if [[ -n $ssid ]]; then
+    ssid=$(iwctl station "$ssid" show 2>/dev/null | awk -F'  +' '/Connected network/{print $NF; exit}' || true)
+  fi
+fi
+ip4=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src"){print $(i+1); exit}}' || true)
+
+mnt="-"
+if mountpoint -q /mnt 2>/dev/null; then
+  mnt=$(findmnt -n -o SOURCE,OPTIONS /mnt | awk '{split($2,o,","); print $1 " (" o[1] ")"}')
+fi
+
+battery=""
+for b in /sys/class/power_supply/BAT*; do
+  [[ -r $b/capacity ]] || continue
+  battery="$(<"$b/capacity")%"
+  [[ $(<"$b/status") == Charging ]] && battery="$battery+"
+  break
+done
+
+case ${1:-} in
+--json)
+  jq -n --arg ssid "$ssid" --arg ip "$ip4" --arg providers "$providers" --arg model "$model" \
+    --arg mnt "$mnt" --arg battery "$battery" --argjson inference "$inference" \
+    '{wifi:$ssid, ip:$ip, providers:($providers|split(",")|map(select(.!=""))), model:$model, mnt:$mnt, battery:$battery, inference:$inference}'
+  ;;
+--tmux)
+  net="#[fg=#f7768e]offline"
+  [[ -n $ip4 ]] && net="#[fg=#9ece6a]${ssid:-ethernet} #[fg=#565f89]$ip4"
+  prov="#[fg=#f7768e]no provider"
+  if [[ -n $providers ]]; then prov="#[fg=#7aa2f7]${model:-$providers}"; elif [[ $inference == true ]]; then prov="#[fg=#e0af68]local model"; fi
+  m="#[fg=#565f89]/mnt -"
+  [[ $mnt != "-" ]] && m="#[fg=#bb9af7]/mnt ${mnt%% *}"
+  bat=""
+  [[ -n $battery ]] && bat=" #[fg=#565f89]bat $battery"
+  printf '%s #[fg=#414868]│ %s #[fg=#414868]│ %s%s#[default]' "$net" "$prov" "$m" "$bat"
+  ;;
+*)
+  printf 'network:   %s\n' "${ip4:+${ssid:-ethernet} $ip4}${ip4:-offline}"
+  printf 'providers: %s\n' "${providers:-none}${inference:+ (local model available)}"
+  printf 'model:     %s\n' "${model:-not set}"
+  printf 'mount:     %s\n' "$mnt"
+  [[ -n $battery ]] && printf 'battery:   %s\n' "$battery"
+  ;;
+esac

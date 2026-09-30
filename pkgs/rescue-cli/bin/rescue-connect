@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# rescue-connect: connect an AI provider at runtime.
+#   rescue-connect             interactive menu
+#   rescue-connect key PROVIDER [--persist]    type a key at the console
+#   rescue-connect phone       QR code, enter the key on your phone
+#   rescue-connect login AGENT (claude|codex|opencode)  the agent's own sign-in, with QR handoff
+set -euo pipefail
+
+say() { gum style --foreground 4 "$*"; }
+warn() { gum style --foreground 3 "$*"; }
+
+providers_json=$(rescue-config providers)
+
+type_key() {
+  local pid=$1 persist=${2:-} label
+  label=$(jq -r --arg p "$pid" '.[$p].label' <<<"$providers_json")
+  url=$(jq -r --arg p "$pid" '.[$p].url' <<<"$providers_json")
+  echo "Keys for $label: $url"
+  key=$(gum input --password --placeholder "Paste the $label API key" --width 80)
+  [[ -n $key ]] || exit 1
+  if [[ -z $persist ]] && mountpoint -q /persist; then
+    gum confirm "Save on the stick (RESCUE_DATA) so it survives a reboot?" && persist=--persist
+  fi
+  # shellcheck disable=SC2086
+  rescue-config set "providers.$pid.key" "$key" $persist
+  if jq -e --arg p "$pid" '.[$p].models_endpoint' <<<"$providers_json" >/dev/null; then
+    rescue-config refresh-models || true
+  fi
+  say "$label connected."
+  rescue-status
+}
+
+login_agent() {
+  case $1 in
+  claude)
+    say "Claude Code prints a sign-in link. Press C-Space u to send it to your phone."
+    sleep 1
+    exec claude
+    ;;
+  codex)
+    say "Codex prints a link and a code. Press C-Space u to send it to your phone."
+    sleep 1
+    exec codex login --device-auth
+    ;;
+  opencode)
+    exec opencode auth login
+    ;;
+  *)
+    warn "unknown agent $1"
+    exit 1
+    ;;
+  esac
+}
+
+case ${1:-menu} in
+key)
+  type_key "$2" "${3:-}"
+  ;;
+phone)
+  exec rescue-handoff key
+  ;;
+login)
+  login_agent "$2"
+  ;;
+menu)
+  mapfile -t rows < <(jq -r 'to_entries[] | "\(.key)\t\(.value.label)\(if .value.free then " (free tier)" else "" end)"' <<<"$providers_json")
+  options=(
+    "phone	Enter a key on my phone (QR code)"
+  )
+  for row in "${rows[@]}"; do options+=("key:${row%%	*}	API key: ${row#*	}"); done
+  options+=(
+    "login:claude	Sign in to Claude Code (subscription)"
+    "login:codex	Sign in to Codex (ChatGPT account)"
+    "login:opencode	Sign in to OpenCode Zen"
+  )
+  pick=$(printf '%s\n' "${options[@]}" | cut -f2 | gum choose --header "Connect an AI provider" --height 16) || exit 1
+  sel=""
+  for row in "${options[@]}"; do [[ ${row#*	} == "$pick" ]] && sel=${row%%	*}; done
+  case $sel in
+  phone) exec rescue-handoff key ;;
+  key:*) type_key "${sel#key:}" ;;
+  login:*) login_agent "${sel#login:}" ;;
+  esac
+  ;;
+*)
+  sed -n '2,6p' "$0"
+  exit 1
+  ;;
+esac

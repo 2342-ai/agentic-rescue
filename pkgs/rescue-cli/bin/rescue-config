@@ -1,0 +1,543 @@
+#!/usr/bin/env python3
+"""rescue-config: turn the configuration slot into agent, network and console configuration.
+
+Sources, later ones override earlier ones (dicts are merged, lists replaced):
+  1. /iso/rescue-config.json            the slot in the ISO image
+  2. /persist/rescue-config.json        writable RESCUE_DATA partition, if present
+  3. /run/agentic-rescue/runtime.json   values entered at runtime (rescue-connect)
+
+Commands:
+  rescue-config apply                    write everything (runs at boot as root)
+  rescue-config show                     merged configuration, secrets masked
+  rescue-config get KEY                  dotted key, e.g. model
+  rescue-config set KEY VALUE [--persist] set a value at runtime and re-apply
+  rescue-config unset KEY [--persist]
+  rescue-config providers                known providers as JSON
+  rescue-config refresh-models           ask providers with a /models endpoint for their catalog
+  rescue-config state                    what is configured, as JSON (used by the menu)
+
+Options:
+  --root DIR   operate below DIR instead of / (used by the checks)
+"""
+
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+SLOT_MAGIC = "agentic-rescue-config-v1"
+AGENTS_MD = "/etc/agentic-rescue/AGENTS.md"
+
+# One table for everything the system knows about a provider.
+#   env:      environment variable the agents read the key from
+#   opencode: "builtin" (opencode knows it from models.dev) or a custom provider block
+#   claude:   how Claude Code reaches it (direct = ANTHROPIC_API_KEY, proxy = base_url + auth token)
+#   codex:    how Codex reaches it (direct = OPENAI_API_KEY, proxy = custom model_provider)
+PROVIDERS = {
+    "2342ai": {
+        "label": "2342.ai",
+        "env": "AI2342_API_KEY",
+        "url": "https://2342.ai",
+        "free": False,
+        "opencode": {
+            "npm": "@ai-sdk/openai-compatible",
+            "baseURL": "https://2342.ai/v1",
+        },
+        "models_endpoint": "https://2342.ai/v1/models",
+        "models": [
+            "claude-sonnet-4-5",
+            "claude-opus-4-5",
+            "gpt-5.4",
+            "gpt-5.3-codex",
+            "gemini-3.5-flash",
+            "glm-5.2",
+        ],
+        "default_model": "claude-sonnet-4-5",
+        "claude": {"proxy": "https://2342.ai", "model": "claude-sonnet-4-5"},
+        "codex": {"proxy": "https://2342.ai/v1", "model": "gpt-5.3-codex"},
+    },
+    "groq": {
+        "label": "Groq",
+        "env": "GROQ_API_KEY",
+        "url": "https://console.groq.com/keys",
+        "free": True,
+        "opencode": "builtin",
+        "default_model": "openai/gpt-oss-120b",
+    },
+    "google": {
+        "label": "Google AI Studio",
+        "env": "GEMINI_API_KEY",
+        "url": "https://aistudio.google.com/apikey",
+        "free": True,
+        "opencode": "builtin",
+        "default_model": "gemini-flash-latest",
+    },
+    "openrouter": {
+        "label": "OpenRouter",
+        "env": "OPENROUTER_API_KEY",
+        "url": "https://openrouter.ai/keys",
+        "free": True,
+        "opencode": "builtin",
+        "default_model": "qwen/qwen3.8-27b:free",
+    },
+    "opencode": {
+        "label": "OpenCode Zen",
+        "env": "OPENCODE_API_KEY",
+        "url": "https://opencode.ai/auth",
+        "free": True,
+        "opencode": "builtin",
+        "default_model": "big-pickle",
+    },
+    "anthropic": {
+        "label": "Anthropic",
+        "env": "ANTHROPIC_API_KEY",
+        "url": "https://console.anthropic.com/settings/keys",
+        "free": False,
+        "opencode": "builtin",
+        "default_model": "claude-sonnet-4-5",
+        "claude": {"direct": True},
+    },
+    "openai": {
+        "label": "OpenAI",
+        "env": "OPENAI_API_KEY",
+        "url": "https://platform.openai.com/api-keys",
+        "free": False,
+        "opencode": "builtin",
+        "default_model": "gpt-5.4",
+        "codex": {"direct": True, "model": "gpt-5.3-codex"},
+    },
+}
+
+# Order in which agents pick a provider when several keys exist.
+CLAUDE_ORDER = ["anthropic", "2342ai"]
+CODEX_ORDER = ["openai", "2342ai"]
+OPENCODE_ORDER = ["2342ai", "anthropic", "openai", "google", "groq", "openrouter", "opencode", "local"]
+
+# Console keymap -> xkb layout.
+KEYMAP_TO_XKB = {"uk": "gb", "dvorak": "us", "colemak": "us", "sg": "ch", "sf": "ch", "be-latin1": "be"}
+
+DESTRUCTIVE = [
+    "mkfs*", "mke2fs*", "mkswap*", "wipefs*", "dd *", "ddrescue *", "sgdisk *", "gdisk *", "fdisk *",
+    "parted *", "sfdisk *", "cryptsetup luksFormat*", "cryptsetup erase*", "cryptsetup luksErase*",
+    "btrfs check --repair*", "btrfs balance*", "btrfs device *", "zpool destroy*", "zpool labelclear*",
+    "zfs destroy*", "zfs rollback*", "fsck*", "e2fsck*", "xfs_repair*", "ntfsfix*", "rm -r*", "rm -f*",
+    "chntpw*", "efibootmgr -*", "bootctl install*", "grub-install*", "snapper rollback*", "mdadm --create*",
+    "mdadm --zero-superblock*", "lvremove*", "vgremove*", "pvremove*", "shred*", "shutdown*", "reboot*",
+    "poweroff*", "systemctl reboot*", "systemctl poweroff*",
+]
+
+ROOT = "/"
+
+
+def p(path):
+    """Path below the operating root."""
+    return os.path.join(ROOT, path.lstrip("/"))
+
+
+def read_json(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return None
+    text = text.strip().rstrip("\0").strip()
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        print(f"rescue-config: {path}: invalid JSON ({exc})", file=sys.stderr)
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def write_file(path, content, mode=0o644, binary=False):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "wb" if binary else "w", encoding=None if binary else "utf-8") as fh:
+        fh.write(content)
+    os.chmod(tmp, mode)
+    os.replace(tmp, path)
+
+
+def write_json(path, data, mode=0o644):
+    write_file(path, json.dumps(data, indent=2, sort_keys=True) + "\n", mode)
+
+
+def symlink(target, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.islink(path) or os.path.exists(path):
+        os.remove(path)
+    os.symlink(target, path)
+
+
+def merge(base, override):
+    out = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def sources():
+    return [
+        ("iso", p("/iso/rescue-config.json")),
+        ("persist", p("/persist/rescue-config.json")),
+        ("runtime", p("/run/agentic-rescue/runtime.json")),
+    ]
+
+
+def load():
+    merged = {}
+    used = []
+    for name, path in sources():
+        data = read_json(path)
+        if data is None:
+            continue
+        if data.get("v", 1) != 1:
+            print(f"rescue-config: {path}: unsupported version {data.get('v')}", file=sys.stderr)
+            continue
+        used.append(name)
+        merged = merge(merged, data)
+    merged.pop("slot", None)
+    merged.pop("v", None)
+    return merged, used
+
+
+def configured_providers(cfg):
+    """Provider id -> key, in priority order, only for providers with a key."""
+    out = {}
+    for pid in OPENCODE_ORDER:
+        entry = (cfg.get("providers") or {}).get(pid) or {}
+        key = entry.get("key") if isinstance(entry, dict) else None
+        if pid in PROVIDERS and key:
+            out[pid] = key
+    return out
+
+
+def inference():
+    return read_json(p("/etc/agentic-rescue/inference.json")) or {}
+
+
+def cached_models(pid):
+    data = read_json(p(f"/run/agentic-rescue/models/{pid}.json"))
+    if data and isinstance(data.get("models"), list) and data["models"]:
+        return data["models"]
+    entry = PROVIDERS[pid]
+    return entry.get("models", [])
+
+
+def pick(order, keys):
+    for pid in order:
+        if pid in keys:
+            return pid
+    return None
+
+
+def default_model(cfg, keys, local):
+    model = cfg.get("model")
+    if model:
+        return model
+    first = pick(OPENCODE_ORDER, keys)
+    if first:
+        pid = first
+        entry = PROVIDERS[pid]
+        models = cached_models(pid) if entry.get("models_endpoint") else []
+        chosen = entry["default_model"] if entry["default_model"] in models or not models else models[0]
+        return f"{pid}/{chosen}"
+    if local:
+        return "local/local"
+    return None
+
+
+def apply(cfg, used):
+    keys = configured_providers(cfg)
+    local = inference()
+    model = default_model(cfg, keys, local)
+    run = p("/run/agentic-rescue")
+    os.makedirs(run, exist_ok=True)
+
+    # 1. Environment for every shell and agent.
+    env = {}
+    for pid, key in keys.items():
+        env[PROVIDERS[pid]["env"]] = key
+    env["AGENTIC_RESCUE_PROVIDERS"] = ",".join(keys)
+    if model:
+        env["AGENTIC_RESCUE_MODEL"] = model
+    if cfg.get("name"):
+        env["AGENTIC_RESCUE_NAME"] = str(cfg["name"])
+    lines = [f"{k}={shlex.quote(str(v))}" for k, v in env.items()]
+    write_file(os.path.join(run, "env"), "\n".join(lines) + "\n", 0o600)
+
+    # 2. opencode
+    opencode = {
+        "$schema": "https://opencode.ai/config.json",
+        "autoupdate": False,
+        "share": "disabled",
+        "instructions": [AGENTS_MD],
+        "permission": {
+            "bash": {"*": "allow", **{pattern: "ask" for pattern in DESTRUCTIVE}},
+            "edit": "ask",
+            "external_directory": "allow",
+            "doom_loop": "ask",
+        },
+        "provider": {},
+    }
+    if model:
+        opencode["model"] = model
+    for pid, key in keys.items():
+        entry = PROVIDERS[pid]
+        if entry["opencode"] == "builtin":
+            continue
+        opencode["provider"][pid] = {
+            "npm": entry["opencode"]["npm"],
+            "name": entry["label"],
+            "options": {"baseURL": entry["opencode"]["baseURL"], "apiKey": "{env:%s}" % entry["env"]},
+            "models": {m: {"name": m} for m in cached_models(pid)},
+        }
+    if local.get("enabled"):
+        opencode["provider"]["local"] = {
+            "npm": "@ai-sdk/openai-compatible",
+            "name": "Local model (llama.cpp)",
+            "options": {"baseURL": local["baseURL"]},
+            "models": {
+                "local": {
+                    "name": local.get("model", "local"),
+                    "limit": {"context": local.get("contextSize", 8192), "output": 4096},
+                }
+            },
+        }
+    if not opencode["provider"]:
+        del opencode["provider"]
+    write_json(p("/root/.config/opencode/opencode.json"), opencode, 0o600)
+
+    # 3. Claude Code
+    claude_env = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+    claude_pid = pick(CLAUDE_ORDER, keys)
+    if claude_pid and PROVIDERS[claude_pid].get("claude", {}).get("proxy"):
+        spec = PROVIDERS[claude_pid]["claude"]
+        claude_env["ANTHROPIC_BASE_URL"] = spec["proxy"]
+        claude_env["ANTHROPIC_AUTH_TOKEN"] = keys[claude_pid]
+        claude_env["ANTHROPIC_MODEL"] = cfg.get("claude_model") or spec["model"]
+    elif cfg.get("claude_model"):
+        claude_env["ANTHROPIC_MODEL"] = cfg["claude_model"]
+    claude = {
+        "env": claude_env,
+        "permissions": {
+            "allow": [
+                "Bash(lsblk:*)", "Bash(blkid:*)", "Bash(findmnt:*)", "Bash(dmesg:*)", "Bash(journalctl:*)",
+                "Bash(smartctl:*)", "Bash(nvme list:*)", "Bash(nvme smart-log:*)", "Bash(cat:*)", "Bash(ls:*)",
+                "Bash(grep:*)", "Bash(rg:*)", "Bash(head:*)", "Bash(tail:*)", "Bash(df:*)", "Bash(du:*)",
+                "Bash(free:*)", "Bash(lspci:*)", "Bash(lsusb:*)", "Bash(lshw:*)", "Bash(inxi:*)",
+                "Bash(dmidecode:*)", "Bash(sensors:*)", "Bash(ip:*)", "Bash(zpool status:*)", "Bash(zpool list:*)",
+                "Bash(zfs list:*)", "Bash(btrfs filesystem:*)", "Bash(btrfs subvolume list:*)", "Bash(efibootmgr)",
+                "Bash(rescue-status:*)", "Bash(rescue-mount)", "Bash(rescue-mount --unmount)",
+            ],
+            "ask": [
+                "Bash(mkfs:*)", "Bash(wipefs:*)", "Bash(dd:*)", "Bash(ddrescue:*)", "Bash(sgdisk:*)", "Bash(fdisk:*)",
+                "Bash(parted:*)", "Bash(cryptsetup luksFormat:*)", "Bash(cryptsetup erase:*)",
+                "Bash(btrfs check:*)", "Bash(zpool destroy:*)", "Bash(zfs destroy:*)", "Bash(fsck:*)",
+                "Bash(xfs_repair:*)", "Bash(rm:*)", "Bash(chntpw:*)", "Bash(efibootmgr -:*)", "Bash(reboot:*)",
+                "Bash(shutdown:*)", "Bash(poweroff:*)",
+            ],
+        },
+        "includeCoAuthoredBy": False,
+    }
+    write_json(p("/root/.claude/settings.json"), claude, 0o600)
+    symlink(AGENTS_MD, p("/root/.claude/CLAUDE.md"))
+    claude_json = p("/root/.claude.json")
+    existing = read_json(claude_json) or {}
+    existing.update({"hasCompletedOnboarding": True, "theme": "dark"})
+    write_json(claude_json, existing, 0o600)
+
+    # 4. Codex
+    codex_pid = pick(CODEX_ORDER, keys)
+    codex = [
+        "# Written by rescue-config. Edit the configuration slot instead.",
+        'approval_policy = "on-request"',
+        'sandbox_mode = "danger-full-access"',
+        "",
+    ]
+    if codex_pid:
+        spec = PROVIDERS[codex_pid].get("codex", {})
+        codex_model = cfg.get("codex_model") or spec.get("model", "gpt-5.3-codex")
+        codex.insert(1, f'model = "{codex_model}"')
+        if spec.get("proxy"):
+            codex.insert(2, f'model_provider = "{codex_pid}"')
+            codex += [
+                f"[model_providers.{codex_pid}]",
+                f'name = "{PROVIDERS[codex_pid]["label"]}"',
+                f'base_url = "{spec["proxy"]}"',
+                f'env_key = "{PROVIDERS[codex_pid]["env"]}"',
+                'wire_api = "responses"',
+                "",
+            ]
+    write_file(p("/root/.codex/config.toml"), "\n".join(codex), 0o600)
+    symlink(AGENTS_MD, p("/root/.codex/AGENTS.md"))
+
+    # 5. Wi-Fi for iwd
+    for net in cfg.get("wifi") or []:
+        if not isinstance(net, dict) or not net.get("ssid"):
+            continue
+        ssid = str(net["ssid"])
+        name = ssid if re.fullmatch(r"[A-Za-z0-9 _-]+", ssid) else "=" + ssid.encode("utf-8").hex()
+        if net.get("psk"):
+            write_file(p(f"/var/lib/iwd/{name}.psk"), f"[Security]\nPassphrase={net['psk']}\n", 0o600)
+        else:
+            write_file(p(f"/var/lib/iwd/{name}.open"), "", 0o600)
+
+    # 6. SSH
+    ssh_keys = [k for k in (cfg.get("ssh_authorized_keys") or []) if isinstance(k, str) and k.strip()]
+    if ssh_keys:
+        os.makedirs(p("/root/.ssh"), exist_ok=True)
+        os.chmod(p("/root/.ssh"), 0o700)
+        write_file(p("/root/.ssh/authorized_keys"), "\n".join(k.strip() for k in ssh_keys) + "\n", 0o600)
+
+    # 7. Tailscale (picked up by agentic-rescue-tailscale.service after tailscaled is up)
+    if cfg.get("tailscale_authkey"):
+        write_file(os.path.join(run, "tailscale-authkey"), str(cfg["tailscale_authkey"]) + "\n", 0o600)
+
+    # 8. Keyboard: kmscon config and the plain VT
+    keymap = str(cfg.get("keymap") or "us")
+    xkb = KEYMAP_TO_XKB.get(keymap, re.split(r"[-_]", keymap)[0])
+    base = ""
+    try:
+        with open(p("/etc/agentic-rescue/kmscon.conf.base"), encoding="utf-8") as fh:
+            base = "".join(line for line in fh if not line.startswith("xkb-layout="))
+    except OSError:
+        pass
+    write_file(os.path.join(run, "kmscon/kmscon.conf"), base + f"xkb-layout={xkb}\n")
+    if ROOT == "/" and keymap != "us":
+        subprocess.run(["loadkeys", keymap], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # 9. State for the menu and the status line
+    state = {
+        "sources": used,
+        "providers": list(keys),
+        "model": model,
+        "agent": cfg.get("agent") or "opencode",
+        "name": cfg.get("name"),
+        "wifi": [n.get("ssid") for n in (cfg.get("wifi") or []) if isinstance(n, dict)],
+        "ssh_keys": len(ssh_keys),
+        "tailscale": bool(cfg.get("tailscale_authkey")),
+        "inference": bool(local.get("enabled")),
+        "keymap": keymap,
+    }
+    write_json(os.path.join(run, "state.json"), state)
+    return state
+
+
+def masked(cfg):
+    out = json.loads(json.dumps(cfg))
+    for entry in (out.get("providers") or {}).values():
+        if isinstance(entry, dict) and entry.get("key"):
+            key = str(entry["key"])
+            entry["key"] = key[:6] + "…" + key[-4:] if len(key) > 12 else "…"
+    for net in out.get("wifi") or []:
+        if isinstance(net, dict) and net.get("psk"):
+            net["psk"] = "…"
+    if out.get("tailscale_authkey"):
+        out["tailscale_authkey"] = "…"
+    return out
+
+
+def set_key(dotted, value, persist):
+    path = p("/persist/rescue-config.json") if persist else p("/run/agentic-rescue/runtime.json")
+    data = read_json(path) or {}
+    data.setdefault("v", 1)
+    node = data
+    parts = dotted.split(".")
+    for part in parts[:-1]:
+        node = node.setdefault(part, {})
+        if not isinstance(node, dict):
+            raise SystemExit(f"rescue-config: {dotted}: {part} is not an object")
+    if value is None:
+        node.pop(parts[-1], None)
+    else:
+        try:
+            parsed = json.loads(value)
+            value = parsed if isinstance(parsed, (list, dict, bool, int, float)) else value
+        except json.JSONDecodeError:
+            pass
+        node[parts[-1]] = value
+    write_json(path, data, 0o600)
+
+
+def get_key(cfg, dotted):
+    node = cfg
+    for part in dotted.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    return node
+
+
+def refresh_models(cfg):
+    keys = configured_providers(cfg)
+    for pid, key in keys.items():
+        endpoint = PROVIDERS[pid].get("models_endpoint")
+        if not endpoint:
+            continue
+        req = urllib.request.Request(endpoint, headers={"Authorization": f"Bearer {key}"})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.load(resp)
+        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as exc:
+            print(f"rescue-config: {pid}: could not fetch models ({exc})", file=sys.stderr)
+            continue
+        ids = sorted(m.get("id") for m in data.get("data", []) if isinstance(m, dict) and m.get("id"))
+        if ids:
+            write_json(p(f"/run/agentic-rescue/models/{pid}.json"), {"models": ids})
+            print(f"{pid}: {len(ids)} models")
+
+
+def main(argv):
+    global ROOT
+    args = list(argv)
+    if "--root" in args:
+        i = args.index("--root")
+        ROOT = args[i + 1]
+        del args[i:i + 2]
+    persist = "--persist" in args
+    args = [a for a in args if a != "--persist"]
+    cmd = args[0] if args else "show"
+    cfg, used = load()
+
+    if cmd == "apply":
+        state = apply(cfg, used)
+        print(json.dumps(state))
+    elif cmd == "show":
+        print(json.dumps(masked(cfg), indent=2, sort_keys=True, ensure_ascii=False))
+    elif cmd == "get":
+        value = get_key(cfg, args[1])
+        print(value if isinstance(value, str) else json.dumps(value))
+    elif cmd == "set":
+        set_key(args[1], args[2], persist)
+        cfg, used = load()
+        apply(cfg, used)
+    elif cmd == "unset":
+        set_key(args[1], None, persist)
+        cfg, used = load()
+        apply(cfg, used)
+    elif cmd == "providers":
+        print(json.dumps(PROVIDERS, indent=2))
+    elif cmd == "refresh-models":
+        refresh_models(cfg)
+        apply(cfg, used)
+    elif cmd == "state":
+        state = read_json(p("/run/agentic-rescue/state.json"))
+        print(json.dumps(state if state else apply(cfg, used)))
+    else:
+        print(__doc__)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# rescue: the menu.
+#   rescue            interactive menu
+#   rescue welcome    banner and hints (shown once on the console)
+#   rescue agent [NAME]   start opencode, claude or codex
+#   rescue keys       tmux key reference
+#   rescue --help
+set -euo pipefail
+
+BLUE="#7aa2f7"
+DIM="#565f89"
+
+banner() {
+  gum style --foreground "$BLUE" --bold "$(figlet -f small "Agentic Rescue" 2>/dev/null || echo "AGENTIC RESCUE")"
+  local name
+  name=$(rescue-config get name 2>/dev/null || true)
+  [[ -n $name && $name != null ]] && gum style --foreground "$DIM" "$name"
+  gum style --foreground "$DIM" "Live system in RAM. Nothing outside mounted disks survives a reboot."
+}
+
+welcome() {
+  banner
+  echo
+  rescue-status
+  echo
+  gum style --foreground "$DIM" "rescue          menu            C-Space m"
+  gum style --foreground "$DIM" "rescue-mount    find and mount the installed system at /mnt (read-only)"
+  gum style --foreground "$DIM" "rescue-connect  connect an AI provider, or sign in to an agent"
+  gum style --foreground "$DIM" "opencode        talk to the agent    (also: claude, codex)"
+  gum style --foreground "$DIM" "impala          Wi-Fi                C-Space w"
+  gum style --foreground "$DIM" "rescue-share    console in a phone browser"
+  echo
+}
+
+keys() {
+  gum style --bold "tmux keys (prefix C-Space)"
+  cat <<'KEYS'
+  m   menu                       u   send the last link on screen to a phone
+  k   connect an AI provider     s   share this console in a browser
+  w   Wi-Fi (impala)             a   start the agent in a new window
+  |   split right                -   split down
+  c   new window                 n / p   next / previous window
+  d   detach (ssh: tmux attach -t rescue)
+KEYS
+}
+
+start_agent() {
+  local agent=${1:-}
+  local state
+  state=$(rescue-config state)
+  [[ -n $agent ]] || agent=$(jq -r '.agent // "opencode"' <<<"$state")
+  local providers
+  providers=$(jq -r '.providers | length' <<<"$state")
+  local inference
+  inference=$(jq -r '.inference' <<<"$state")
+  if [[ $providers == 0 && $inference != true && $agent == opencode ]]; then
+    gum style --foreground 3 "No AI provider configured yet."
+    if gum confirm "Connect one now?"; then
+      rescue-connect
+    else
+      return 1
+    fi
+  fi
+  case $agent in
+  opencode) exec opencode ;;
+  claude) exec claude ;;
+  codex) exec codex ;;
+  *)
+    echo "unknown agent: $agent" >&2
+    return 1
+    ;;
+  esac
+}
+
+menu() {
+  while true; do
+    clear
+    banner
+    echo
+    rescue-status
+    echo
+    local mounted="Mount installed system (read-only)"
+    mountpoint -q /mnt && mounted="Unmount /mnt"
+    choice=$(gum choose --height 14 --cursor "› " \
+      "Start agent" \
+      "Connect AI provider" \
+      "Wi-Fi" \
+      "$mounted" \
+      "Enter installed system (chroot)" \
+      "Share console to phone" \
+      "Save keys on the stick (RESCUE_DATA)" \
+      "Hardware overview" \
+      "Shell" \
+      "Reboot" \
+      "Power off") || exit 0
+    case $choice in
+    "Start agent")
+      agent=$(gum choose "opencode" "claude" "codex") || continue
+      start_agent "$agent"
+      ;;
+    "Connect AI provider") rescue-connect ;;
+    "Wi-Fi") impala ;;
+    "Mount installed system (read-only)") rescue-mount; read -r -p "Enter to continue" ;;
+    "Unmount /mnt") rescue-mount --unmount; read -r -p "Enter to continue" ;;
+    "Enter installed system (chroot)")
+      if ! mountpoint -q /mnt; then rescue-mount || { read -r -p "Enter to continue"; continue; }; fi
+      if findmnt -n -o OPTIONS /mnt | grep -qw ro && gum confirm "Remount /mnt writable for repairs?"; then
+        rescue-mount --unmount && rescue-mount --rw
+      fi
+      rescue-enter || true
+      ;;
+    "Share console to phone") rescue-share; read -r -p "Enter to continue" ;;
+    "Save keys on the stick (RESCUE_DATA)") rescue-persist; read -r -p "Enter to continue" ;;
+    "Hardware overview") fastfetch; inxi -Fxz 2>/dev/null | head -60; read -r -p "Enter to continue" ;;
+    "Shell") exit 0 ;;
+    "Reboot") gum confirm "Reboot now?" && { rescue-mount --unmount || true; systemctl reboot; } ;;
+    "Power off") gum confirm "Power off now?" && { rescue-mount --unmount || true; systemctl poweroff; } ;;
+    esac
+  done
+}
+
+case ${1:-menu} in
+menu) menu ;;
+welcome) welcome ;;
+agent) start_agent "${2:-}" ;;
+keys) keys ;;
+-h | --help) sed -n '2,7p' "$0" ;;
+*)
+  echo "unknown command: $1" >&2
+  exit 1
+  ;;
+esac

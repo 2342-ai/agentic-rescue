@@ -1,0 +1,81 @@
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      variants:
+        description: "Variants to build (space separated: online offline)"
+        default: "online"
+
+env:
+  # Where the download page fetches release-<variant>.json and the ISOs from.
+  RELEASE_BUCKET: ${{ vars.RELEASE_BUCKET }}
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [online, offline]
+    steps:
+      - name: Skip variants not requested
+        id: want
+        run: |
+          wanted="${{ github.event.inputs.variants || 'online offline' }}"
+          case " $wanted " in *" ${{ matrix.variant }} "*) echo run=true >> "$GITHUB_OUTPUT" ;; *) echo run=false >> "$GITHUB_OUTPUT" ;; esac
+      - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'true'
+      - name: Free disk space
+        if: steps.want.outputs.run == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune -af || true
+          df -h /
+      - uses: cachix/install-nix-action@v31
+        if: steps.want.outputs.run == 'true'
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+      - name: Build release (ISO + release.json)
+        if: steps.want.outputs.run == 'true'
+        run: |
+          suffix=""; [ "${{ matrix.variant }}" = offline ] && suffix="-offline"
+          nix build -L ".#packages.x86_64-linux.release$suffix" -o result
+          ls -la result/
+          cat result/release.json
+      - name: End-to-end slot patch check
+        if: steps.want.outputs.run == 'true' && matrix.variant == 'online'
+        run: nix build -L .#checks.x86_64-linux.slot-patch
+      - name: Collect artifacts
+        if: steps.want.outputs.run == 'true'
+        run: |
+          mkdir -p dist
+          cp -L result/agentic-rescue-*-x86_64-linux.iso dist/ 2>/dev/null || cp -L result/*.iso dist/
+          cp result/release.json "dist/release-${{ matrix.variant }}.json"
+          ls -la dist/
+      - name: Upload to release bucket (rclone, S3-compatible)
+        if: steps.want.outputs.run == 'true' && env.RELEASE_BUCKET != ''
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          nix run nixpkgs#rclone -- copy --progress dist/ "r2:${RELEASE_BUCKET}/"
+      - name: Attach to GitHub release
+        if: steps.want.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes "Agentic Rescue ${{ github.ref_name }}" 2>/dev/null || true
+          gh release upload "${{ github.ref_name }}" dist/* --clobber
+      - uses: actions/upload-artifact@v4
+        if: steps.want.outputs.run == 'true'
+        with:
+          name: agentic-rescue-${{ matrix.variant }}
+          path: dist/release-${{ matrix.variant }}.json

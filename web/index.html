@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic Rescue</title>
+<meta name="description" content="A rescue stick with an AI agent inside. Boot, mount, repair. Your API key is written into the image while it downloads, in your browser.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span> Agentic Rescue</div>
+  <nav>
+    <a href="#how" data-i18n="nav.how">How it works</a>
+    <a href="#build" data-i18n="nav.build">Build it yourself</a>
+    <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
+    <button class="lang" id="lang" aria-label="Language">DE</button>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1 data-i18n="hero.title">A rescue stick with an agent inside.</h1>
+    <p class="lead" data-i18n="hero.lead">NixOS live system. opencode, Claude Code and Codex ready at the console. Your API key goes into the image while it downloads, in your browser, so the stick works the moment it boots.</p>
+  </section>
+
+  <section class="card" id="download">
+    <h2 data-i18n="dl.title">Download</h2>
+
+    <div class="field">
+      <label data-i18n="dl.provider">AI provider</label>
+      <div class="providers" id="providers"></div>
+    </div>
+
+    <div class="field">
+      <label for="key" data-i18n="dl.key">API key</label>
+      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="…">
+      <p class="hint" id="key-hint"></p>
+    </div>
+
+    <details class="more">
+      <summary data-i18n="dl.more">Wi-Fi, SSH, keyboard (optional)</summary>
+      <div class="grid">
+        <div class="field"><label for="wifi-ssid">Wi-Fi SSID</label><input id="wifi-ssid" autocomplete="off"></div>
+        <div class="field"><label for="wifi-psk" data-i18n="dl.wifipsk">Wi-Fi password</label><input id="wifi-psk" type="password" autocomplete="off"></div>
+        <div class="field"><label for="keymap" data-i18n="dl.keymap">Keyboard layout</label>
+          <select id="keymap"><option value="us">us</option><option value="de">de</option><option value="de-latin1-nodeadkeys">de (no dead keys)</option><option value="uk">uk</option><option value="fr">fr</option><option value="es">es</option><option value="it">it</option><option value="ch">ch</option><option value="dvorak">dvorak</option></select></div>
+        <div class="field"><label for="name" data-i18n="dl.name">Name on the console</label><input id="name" autocomplete="off" placeholder="Franz' rescue stick"></div>
+        <div class="field wide"><label for="sshkey" data-i18n="dl.ssh">SSH public key (root login)</label><textarea id="sshkey" rows="2" spellcheck="false" placeholder="ssh-ed25519 AAAA…"></textarea></div>
+        <div class="field wide"><label for="model" data-i18n="dl.model">Default model (provider/model)</label><input id="model" autocomplete="off"></div>
+      </div>
+    </details>
+
+    <div class="variants" id="variants"></div>
+
+    <button class="primary" id="go" data-i18n="dl.go">Download ISO with my key</button>
+    <button class="secondary" id="plain" data-i18n="dl.plain">Download unconfigured ISO</button>
+
+    <div class="progress" id="progress" hidden>
+      <div class="bar"><div id="bar"></div></div>
+      <p id="status"></p>
+    </div>
+
+    <p class="fine" data-i18n="dl.fine">The key never leaves your browser. The page streams the image from the download server, replaces one 16 KiB block in place and hands the result to your disk. The original image's checksum is verified while it streams.</p>
+  </section>
+
+  <section id="how" class="text">
+    <h2 data-i18n="how.title">How it works</h2>
+    <ol>
+      <li data-i18n="how.1">Write the ISO to a USB stick with dd, Etcher or Ventoy. Any method works, the key sits in a normal file inside the image.</li>
+      <li data-i18n="how.2">Boot. You land in a console with a menu. If you entered Wi-Fi, the stick is already online.</li>
+      <li data-i18n="how.3">rescue-mount finds the installed system, unlocks it and mounts it read-only. Then talk to opencode, Claude Code or Codex about what is wrong.</li>
+      <li data-i18n="how.4">No key? Press C-Space k and enter one from your phone via QR code, or sign in to Claude or Codex with your subscription the same way.</li>
+    </ol>
+    <p data-i18n="how.p">Read-only first, destructive commands only after an explicit yes, backups before edits: the agents carry these rules as their instructions.</p>
+  </section>
+
+  <section id="build" class="text">
+    <h2 data-i18n="build.title">Build it yourself</h2>
+    <p data-i18n="build.p">The whole system is one Nix flake. Build the image, patch a slot, or bake your configuration in at build time.</p>
+<pre><code>nix build github:2342-ai/agentic-rescue#iso
+nix run github:2342-ai/agentic-rescue#patch -- result/iso/*.iso \
+  --provider groq --key gsk_… --wifi "Home" "secret" -o my-rescue.iso</code></pre>
+  </section>
+</main>
+
+<footer>
+  <span>Agentic Rescue</span>
+  <a href="https://2342.ai" rel="noopener">2342.ai</a>
+  <a href="https://anycast.io" rel="noopener">anycast.io</a>
+  <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
+  <span id="version"></span>
+</footer>
+
+<script src="config.js"></script>
+<script src="i18n.js"></script>
+<script src="providers.js"></script>
+<script src="patch.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

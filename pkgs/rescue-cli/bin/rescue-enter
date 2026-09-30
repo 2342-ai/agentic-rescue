@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# rescue-enter: chroot into the system mounted at /mnt (or TARGET).
+#   rescue-enter [TARGET] [-- COMMAND...]
+# NixOS roots use nixos-enter, everything else arch-chroot (works for any distro).
+set -euo pipefail
+
+target=/mnt
+if [[ ${1:-} && ${1:-} != -- ]]; then
+  target=$1
+  shift
+fi
+[[ ${1:-} == -- ]] && shift
+
+if ! mountpoint -q "$target"; then
+  echo "$target is not mounted. Run rescue-mount first." >&2
+  exit 1
+fi
+
+if findmnt -n -o OPTIONS "$target" | grep -qw ro; then
+  gum style --foreground 3 "$target is mounted read-only. Repairs need 'rescue-mount --rw'."
+fi
+
+if [[ -e $target/etc/NIXOS ]]; then
+  if (($#)); then
+    exec nixos-enter --root "$target" -c "$*"
+  fi
+  exec nixos-enter --root "$target"
+fi
+
+if [[ -e $target/etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  name=$(. "$target/etc/os-release" && echo "${PRETTY_NAME:-$NAME}")
+  echo "Entering $name at $target"
+fi
+exec arch-chroot "$target" "$@"

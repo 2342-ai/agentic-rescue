@@ -1,0 +1,42 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+jobs:
+  cloudflare-pages:
+    # Works while the repository is private. Needs CLOUDFLARE_API_TOKEN,
+    # CLOUDFLARE_ACCOUNT_ID and the variable CF_PAGES_PROJECT.
+    if: vars.CF_PAGES_PROJECT != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web --project-name=${{ vars.CF_PAGES_PROJECT }} --branch=main
+
+  github-pages:
+    # Only possible once the repository is public (or on a paid plan).
+    if: vars.ENABLE_GITHUB_PAGES == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

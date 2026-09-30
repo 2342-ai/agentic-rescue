@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""agentic-rescue-patch: write a configuration into the slot of an Agentic Rescue ISO.
+
+  agentic-rescue-patch ISO [-o OUT] [--config FILE | --provider ID --key KEY ...]
+  agentic-rescue-patch ISO --locate          print the slot offset and length as JSON
+  agentic-rescue-patch ISO --extract         print the current slot content
+
+Options:
+  -o, --output OUT        write a patched copy instead of patching in place
+  --config FILE           JSON file with the full configuration (see README)
+  --provider ID           provider id (2342ai, groq, google, openrouter, opencode, anthropic, openai)
+  --key KEY               API key for --provider (may be repeated in pairs)
+  --model MODEL           default model, e.g. groq/openai/gpt-oss-120b
+  --wifi SSID PSK         Wi-Fi network (may be repeated)
+  --ssh-key KEY           authorized SSH public key (may be repeated)
+  --keymap MAP            console keymap, e.g. de
+  --name NAME             a label shown on the console
+  --release FILE          release.json with the offset; otherwise the ISO is scanned
+
+The slot is located by the marker "slot":"agentic-rescue-config-v1". It is always
+preserved in the written JSON so the image can be patched again later.
+"""
+
+import argparse
+import json
+import mmap
+import os
+import shutil
+import sys
+
+MAGIC = b'"slot":"agentic-rescue-config-v1"'
+MAGIC_VALUE = "agentic-rescue-config-v1"
+DEFAULT_LENGTH = 16384
+
+
+def locate(path, release=None):
+    if release:
+        with open(release, encoding="utf-8") as fh:
+            rel = json.load(fh)
+        return int(rel["configOffset"]), int(rel["configLength"])
+    with open(path, "rb") as fh:
+        mm = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
+        try:
+            first = mm.find(MAGIC)
+            if first < 0:
+                raise SystemExit("no configuration slot found in this image")
+            if mm.find(MAGIC, first + 1) >= 0:
+                raise SystemExit("more than one slot marker found; use --release to pick the offset")
+            # The marker may sit after nested objects; walk back over every "{"
+            # until the slot-sized region parses as JSON followed by padding.
+            start = first
+            found = None
+            while True:
+                start = mm.rfind(b"{", max(0, first - DEFAULT_LENGTH), start)
+                if start < 0:
+                    break
+                if start + DEFAULT_LENGTH <= len(mm):
+                    region = bytes(mm[start:start + DEFAULT_LENGTH])
+                    body = region.rstrip(b" ")
+                    try:
+                        if isinstance(json.loads(body.decode("utf-8")), dict) and region[len(body):].strip(b" ") == b"":
+                            found = start
+                            break
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        pass
+                if start == 0:
+                    break
+            if found is None:
+                raise SystemExit("slot marker found but the surrounding bytes are not a JSON slot")
+            start = found
+            return start, DEFAULT_LENGTH
+        finally:
+            mm.close()
+
+
+def read_slot(path, offset, length):
+    with open(path, "rb") as fh:
+        fh.seek(offset)
+        return fh.read(length)
+
+
+def build_config(args):
+    if args.config:
+        with open(args.config, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        if not isinstance(cfg, dict):
+            raise SystemExit("--config must contain a JSON object")
+    else:
+        cfg = {}
+    if len(args.provider) != len(args.key):
+        raise SystemExit("--provider and --key must be given in pairs")
+    for pid, key in zip(args.provider, args.key):
+        cfg.setdefault("providers", {})[pid] = {"key": key}
+    if args.model:
+        cfg["model"] = args.model
+    if args.wifi:
+        cfg["wifi"] = [{"ssid": ssid, "psk": psk} for ssid, psk in args.wifi]
+    if args.ssh_key:
+        cfg["ssh_authorized_keys"] = args.ssh_key
+    if args.keymap:
+        cfg["keymap"] = args.keymap
+    if args.name:
+        cfg["name"] = args.name
+    cfg["v"] = 1
+    cfg["slot"] = MAGIC_VALUE
+    return cfg
+
+
+def encode(cfg, length):
+    data = json.dumps(cfg, separators=(",", ":"), ensure_ascii=False, sort_keys=True).encode("utf-8")
+    if MAGIC not in data:
+        raise SystemExit("internal error: marker missing from encoded configuration")
+    if len(data) > length:
+        raise SystemExit(f"configuration is {len(data)} bytes, the slot holds {length}")
+    return data + b" " * (length - len(data))
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("iso")
+    ap.add_argument("-o", "--output")
+    ap.add_argument("--config")
+    ap.add_argument("--provider", action="append", default=[])
+    ap.add_argument("--key", action="append", default=[])
+    ap.add_argument("--model")
+    ap.add_argument("--wifi", nargs=2, action="append", metavar=("SSID", "PSK"))
+    ap.add_argument("--ssh-key", action="append")
+    ap.add_argument("--keymap")
+    ap.add_argument("--name")
+    ap.add_argument("--release")
+    ap.add_argument("--locate", action="store_true")
+    ap.add_argument("--extract", action="store_true")
+    args = ap.parse_args()
+
+    offset, length = locate(args.iso, args.release)
+    if args.locate:
+        print(json.dumps({"configOffset": offset, "configLength": length}))
+        return 0
+    if args.extract:
+        sys.stdout.write(read_slot(args.iso, offset, length).decode("utf-8", "replace").rstrip(" \0") + "\n")
+        return 0
+
+    cfg = build_config(args)
+    payload = encode(cfg, length)
+
+    target = args.iso
+    if args.output:
+        shutil.copyfile(args.iso, args.output)
+        target = args.output
+    with open(target, "r+b") as fh:
+        fh.seek(offset)
+        fh.write(payload)
+        fh.flush()
+        os.fsync(fh.fileno())
+    keys = ", ".join(cfg.get("providers", {}).keys()) or "no providers"
+    print(f"patched {target} at offset {offset}: {keys}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# rescue-mount: find the installed system and mount it at /mnt, read-only unless asked.
+#
+#   rescue-mount [--rw] [TARGET]      unlock LUKS, activate LVM/mdadm, import ZFS, mount
+#   rescue-mount --unmount [TARGET]   unmount, export pools, close LUKS
+#   rescue-mount --list               show candidate root filesystems
+#
+# Detection order: a filesystem containing /etc/NIXOS, /etc/os-release or
+# /Windows. Btrfs roots are probed for @ or @root subvolumes (Arch/Omarchy/
+# openSUSE layouts). Everything under the root's /etc/fstab (or NixOS's
+# hardware config) is not replayed automatically; the ESP is mounted when it is
+# obvious, everything else is left to the person or the agent.
+set -euo pipefail
+
+target=/mnt
+mode=ro
+action=mount
+
+for arg in "$@"; do
+  case $arg in
+  --rw) mode=rw ;;
+  --ro) mode=ro ;;
+  --unmount | -u) action=unmount ;;
+  --list | -l) action=list ;;
+  -h | --help)
+    sed -n '2,12p' "$0"
+    exit 0
+    ;;
+  *) target=$arg ;;
+  esac
+done
+
+say() { gum style --foreground 4 "$*"; }
+warn() { gum style --foreground 3 "$*"; }
+
+unmount_all() {
+  if mountpoint -q "$target"; then
+    sync
+    umount -R "$target" && say "Unmounted $target."
+  fi
+  if command -v zpool >/dev/null; then
+    for pool in $(zpool list -H -o name 2>/dev/null); do
+      zpool export "$pool" 2>/dev/null && say "Exported ZFS pool $pool."
+    done
+  fi
+  for mapper in /dev/mapper/rescue_luks*; do
+    [[ -e $mapper ]] || continue
+    cryptsetup close "${mapper##*/}" && say "Locked ${mapper##*/}."
+  done
+}
+
+unlock_luks() {
+  local device index=0 name
+  while read -r device; do
+    lsblk -rno TYPE "$device" | grep -qx crypt && continue
+    if lsblk -rno NAME,TYPE "$device" | awk 'NR>1 && $2=="crypt"' | grep -q .; then
+      continue
+    fi
+    name=rescue_luks$index
+    index=$((index + 1))
+    say "Encrypted volume $device. Type its passphrase (nothing is stored)."
+    cryptsetup open "$device" "$name" </dev/tty || warn "Could not unlock $device, skipping."
+  done < <(lsblk -rpno NAME,FSTYPE | awk '$2=="crypto_LUKS"{print $1}')
+}
+
+activate_volumes() {
+  vgchange -ay >/dev/null 2>&1 || true
+  mdadm --assemble --scan >/dev/null 2>&1 || true
+  if command -v zpool >/dev/null; then
+    # -N: import without mounting, -f: previous host still owns it, -o readonly for the ro case.
+    local ro=""
+    [[ $mode == ro ]] && ro="-o readonly=on"
+    # shellcheck disable=SC2086
+    zpool import -a -N -f $ro >/dev/null 2>&1 || true
+  fi
+  udevadm settle
+}
+
+probe_dir() {
+  local dir=$1
+  [[ -e $dir/etc/NIXOS ]] && { echo "nixos"; return; }
+  [[ -e $dir/etc/os-release ]] && { echo "linux"; return; }
+  [[ -d $dir/Windows/System32 ]] && { echo "windows"; return; }
+  return 1
+}
+
+# Print "device fstype subvol kind label" for every filesystem that looks like a root.
+candidates() {
+  local device fstype label probe kind sub
+  probe=$(mktemp -d)
+  while read -r device fstype label; do
+    case $fstype in
+    crypto_LUKS | swap | squashfs | iso9660 | LVM2_member | linux_raid_member | zfs_member | "") continue ;;
+    esac
+    if [[ $fstype == btrfs ]]; then
+      if mount -o ro,subvolid=5 "$device" "$probe" 2>/dev/null; then
+        for sub in "" @ @root; do
+          if kind=$(probe_dir "$probe/$sub"); then
+            echo "$device btrfs ${sub:--} $kind ${label:--}"
+            break
+          fi
+        done
+        umount "$probe"
+      fi
+      continue
+    fi
+    if mount -o ro "$device" "$probe" 2>/dev/null; then
+      if kind=$(probe_dir "$probe"); then
+        echo "$device $fstype - $kind ${label:--}"
+      fi
+      umount "$probe"
+    fi
+  done < <(lsblk -rpno NAME,FSTYPE,LABEL | awk 'NF>=2')
+  if command -v zfs >/dev/null; then
+    while read -r ds mp; do
+      [[ $mp == / || $mp == legacy ]] || continue
+      if zfs mount -o ro "$ds" 2>/dev/null || mount -t zfs -o ro "$ds" "$probe" 2>/dev/null; then
+        dir=$(zfs get -H -o value mountpoint "$ds")
+        [[ $dir == legacy ]] && dir=$probe
+        if kind=$(probe_dir "$dir"); then
+          echo "zfs:$ds zfs - $kind ${ds%%/*}"
+        fi
+        zfs unmount "$ds" 2>/dev/null || umount "$probe" 2>/dev/null || true
+      fi
+    done < <(zfs list -H -o name,mountpoint 2>/dev/null)
+  fi
+  rmdir "$probe"
+}
+
+mount_root() {
+  local device=$1 fstype=$2 sub=$3 kind=$4 opts="$mode"
+  mkdir -p "$target"
+  case $fstype in
+  btrfs)
+    [[ $sub != - ]] && opts="$opts,subvol=$sub"
+    mount -o "$opts" "$device" "$target"
+    ;;
+  zfs)
+    local ds=${device#zfs:}
+    zfs set mountpoint=legacy "$ds" 2>/dev/null || true
+    mount -t zfs -o "$mode" "$ds" "$target"
+    ;;
+  ntfs)
+    mount -t ntfs3 -o "$mode" "$device" "$target" 2>/dev/null || mount -t ntfs-3g -o "$mode" "$device" "$target"
+    ;;
+  *)
+    mount -o "$opts" "$device" "$target"
+    ;;
+  esac
+  say "Mounted $device ($fstype${sub:+ $sub}) at $target, $mode."
+
+  # Extra btrfs subvolumes in the common @-layout.
+  if [[ $fstype == btrfs && $sub == @ ]]; then
+    local extra path
+    for extra in @home:/home @log:/var/log @pkg:/var/cache/pacman/pkg @cache:/var/cache @snapshots:/.snapshots @var:/var; do
+      path=${extra#*:}
+      [[ -d $target$path ]] || continue
+      mountpoint -q "$target$path" && continue
+      mount -o "$mode,subvol=${extra%%:*}" "$device" "$target$path" 2>/dev/null && say "  ${extra%%:*} -> $path"
+    done
+  fi
+
+  # NixOS: the rest of the layout lives in the configuration; mount /nix if it is separate.
+  if [[ $kind == nixos && ! -d $target/nix/store ]]; then
+    warn "This NixOS root has no /nix/store; /nix is on another filesystem. Mount it before rescue-enter."
+  fi
+
+  # The EFI system partition, if there is exactly one and its mount point is obvious.
+  local esp
+  esp=$(lsblk -rpno NAME,PARTTYPE | awk 'tolower($2)=="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"{print $1}')
+  if [[ -n $esp && $(wc -l <<<"$esp") -eq 1 ]]; then
+    local dir
+    for dir in /boot/efi /efi /boot; do
+      [[ -d $target$dir ]] || continue
+      mountpoint -q "$target$dir" && break
+      # /boot that already holds kernels is not the ESP.
+      [[ $dir == /boot && -n $(ls -A "$target/boot" 2>/dev/null) ]] && continue
+      mount -o "$mode" "$esp" "$target$dir" 2>/dev/null && say "  ESP $esp -> $dir" && break
+    done
+  fi
+}
+
+case $action in
+unmount)
+  unmount_all
+  exit 0
+  ;;
+list)
+  unlock_luks
+  activate_volumes
+  candidates | column -t -N DEVICE,FSTYPE,SUBVOL,KIND,LABEL
+  exit 0
+  ;;
+esac
+
+if mountpoint -q "$target"; then
+  say "$target is already mounted:"
+  findmnt -R "$target"
+  exit 0
+fi
+
+unlock_luks
+activate_volumes
+
+mapfile -t found < <(candidates)
+if ((${#found[@]} == 0)); then
+  warn "No installed system found. Filesystems seen:"
+  lsblk -f
+  exit 1
+fi
+
+choice=${found[0]}
+if ((${#found[@]} > 1)); then
+  choice=$(printf '%s\n' "${found[@]}" | column -t | gum choose --header "Several systems found. Which one?" | awk '{print $1, $2, $3, $4, $5}')
+  [[ -n $choice ]] || exit 1
+fi
+
+read -r device fstype sub kind _ <<<"$choice"
+if [[ $kind == windows && $mode == rw ]]; then
+  warn "Windows volume: mounting writable. Make sure Windows is not hibernated (fast startup)."
+fi
+mount_root "$device" "$fstype" "$sub" "$kind"
+
+echo
+findmnt -R "$target" -o TARGET,SOURCE,FSTYPE,OPTIONS | head -20
+echo
+if [[ $mode == ro ]]; then
+  echo "Read-only. Re-run 'rescue-mount --rw' when you want to repair. Then 'rescue-enter'."
+else
+  echo "Writable. 'rescue-enter' chroots in; 'rescue-mount --unmount' before reboot."
+fi
