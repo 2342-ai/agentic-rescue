@@ -54,7 +54,7 @@ fi
 
 url="http://$address:$PORT/$(<"$TOKEN_FILE")/"
 echo
-qrencode -t ansiutf8 -m 1 -l L "$url"
+qrencode -t ansiutf8 -m 2 -l L "$url"
 echo
 gum style --foreground 4 "$url"
 echo "Anyone with this address controls a root shell. Run 'rescue-share stop' when done."

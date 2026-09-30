@@ -280,6 +280,7 @@ def apply(cfg, used):
         "$schema": "https://opencode.ai/config.json",
         "autoupdate": False,
         "share": "disabled",
+        "theme": "tokyonight",
         "instructions": [AGENTS_MD],
         "permission": {
             "bash": {"*": "allow", **{pattern: "ask" for pattern in DESTRUCTIVE}},
@@ -354,6 +355,11 @@ def apply(cfg, used):
     claude_json = p("/root/.claude.json")
     existing = read_json(claude_json) or {}
     existing.update({"hasCompletedOnboarding": True, "theme": "dark"})
+    # The live home and the mounted system are the only places the agent works in;
+    # skip the "do you trust this folder" prompt for them.
+    projects = existing.setdefault("projects", {})
+    for folder in ("/root", "/mnt"):
+        projects.setdefault(folder, {})["hasTrustDialogAccepted"] = True
     write_json(claude_json, existing, 0o600)
 
     # 4. Codex
@@ -362,6 +368,12 @@ def apply(cfg, used):
         "# Written by rescue-config. Edit the configuration slot instead.",
         'approval_policy = "on-request"',
         'sandbox_mode = "danger-full-access"',
+        "",
+        '[projects."/root"]',
+        'trust_level = "trusted"',
+        "",
+        '[projects."/mnt"]',
+        'trust_level = "trusted"',
         "",
     ]
     if codex_pid:

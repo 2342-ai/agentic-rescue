@@ -14,15 +14,14 @@ nix build .#release                           # slow: the ISO and release.json
 nix flake check                               # everything, including the end-to-end slot test
 ```
 
-Boot the result in a VM:
+Boot the result in a VM and check the console end to end (serial console, needs KVM):
 
 ```sh
-nix shell nixpkgs#qemu -c qemu-system-x86_64 -enable-kvm -m 4G -cpu host \
-  -cdrom result/iso/*.iso -boot d -serial mon:stdio -display none \
-  -append "console=ttyS0"
+nix shell nixpkgs#qemu nixpkgs#xorriso nixpkgs#python3 -c \
+  python3 tests/boot-qemu.py result/agentic-rescue-online.iso --expect GROQ_API_KEY=gsk_test
 ```
 
-(The default boot entry uses kmscon on the framebuffer; add `-display gtk` to see it, or pick the "basic console" entry.)
+It boots the image with direct kernel boot, leaves the menu with Escape, and checks that the configuration service ran, all three agents are configured and `rescue`, `rescue welcome` and `rescue-status` exit cleanly. Patch a key in first with `nix run .#patch` to test the configured path.
 
 ## Where things live
 

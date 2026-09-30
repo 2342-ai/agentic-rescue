@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# rescue-status: one line about network, provider and mount state.
-#   rescue-status          human readable
+# rescue-status: network, AI provider and mount state.
+#   rescue-status          human readable, one line per item
+#   rescue-status --line   one coloured line (menu header)
 #   rescue-status --tmux   coloured for the tmux status line
 #   rescue-status --json
 set -euo pipefail
@@ -12,14 +13,29 @@ inference=$(jq -r '.inference // false' <<<"$state")
 
 ssid=""
 if command -v iwctl >/dev/null; then
-  ssid=$(iwctl station list 2>/dev/null | awk '$NF=="connected"{print $1; exit}' || true)
-  if [[ -n $ssid ]]; then
-    ssid=$(iwctl station "$ssid" show 2>/dev/null | awk -F'  +' '/Connected network/{print $NF; exit}' || true)
+  dev=$(iwctl station list 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '$NF=="connected"{print $1; exit}' || true)
+  if [[ -n $dev ]]; then
+    ssid=$(iwctl station "$dev" show 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk -F'  +' '/Connected network/{print $NF; exit}' || true)
   fi
 fi
 ip4=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src"){print $(i+1); exit}}' || true)
 
-mnt="-"
+net="offline"
+if [[ -n $ip4 ]]; then
+  net="${ssid:-ethernet} $ip4"
+fi
+
+ai="none"
+if [[ -n $model ]]; then
+  ai=$model
+elif [[ -n $providers ]]; then
+  ai=$providers
+fi
+if [[ $ai == none && $inference == true ]]; then
+  ai="local model"
+fi
+
+mnt="not mounted"
 if mountpoint -q /mnt 2>/dev/null; then
   mnt=$(findmnt -n -o SOURCE,OPTIONS /mnt | awk '{split($2,o,","); print $1 " (" o[1] ")"}')
 fi
@@ -28,32 +44,42 @@ battery=""
 for b in /sys/class/power_supply/BAT*; do
   [[ -r $b/capacity ]] || continue
   battery="$(<"$b/capacity")%"
-  [[ $(<"$b/status") == Charging ]] && battery="$battery+"
+  if [[ $(<"$b/status") == Charging ]]; then battery="$battery+"; fi
   break
 done
 
 case ${1:-} in
 --json)
-  jq -n --arg ssid "$ssid" --arg ip "$ip4" --arg providers "$providers" --arg model "$model" \
-    --arg mnt "$mnt" --arg battery "$battery" --argjson inference "$inference" \
-    '{wifi:$ssid, ip:$ip, providers:($providers|split(",")|map(select(.!=""))), model:$model, mnt:$mnt, battery:$battery, inference:$inference}'
+  jq -n --arg net "$net" --arg ssid "$ssid" --arg ip "$ip4" --arg providers "$providers" --arg model "$model" \
+    --arg ai "$ai" --arg mnt "$mnt" --arg battery "$battery" --argjson inference "$inference" \
+    '{net:$net, wifi:$ssid, ip:$ip, providers:($providers|split(",")|map(select(.!=""))), model:$model, ai:$ai, mnt:$mnt, battery:$battery, inference:$inference}'
   ;;
 --tmux)
-  net="#[fg=#f7768e]offline"
-  [[ -n $ip4 ]] && net="#[fg=#9ece6a]${ssid:-ethernet} #[fg=#565f89]$ip4"
-  prov="#[fg=#f7768e]no provider"
-  if [[ -n $providers ]]; then prov="#[fg=#7aa2f7]${model:-$providers}"; elif [[ $inference == true ]]; then prov="#[fg=#e0af68]local model"; fi
+  n="#[fg=#f7768e]offline"
+  if [[ -n $ip4 ]]; then n="#[fg=#9ece6a]${ssid:-ethernet} #[fg=#565f89]$ip4"; fi
+  a="#[fg=#f7768e]no provider"
+  if [[ $ai != none ]]; then a="#[fg=#7aa2f7]$ai"; fi
   m="#[fg=#565f89]/mnt -"
-  [[ $mnt != "-" ]] && m="#[fg=#bb9af7]/mnt ${mnt%% *}"
+  if [[ $mnt != "not mounted" ]]; then m="#[fg=#bb9af7]/mnt ${mnt%% *}"; fi
   bat=""
-  [[ -n $battery ]] && bat=" #[fg=#565f89]bat $battery"
-  printf '%s #[fg=#414868]│ %s #[fg=#414868]│ %s%s#[default]' "$net" "$prov" "$m" "$bat"
+  if [[ -n $battery ]]; then bat=" #[fg=#414868]│ #[fg=#565f89]bat $battery"; fi
+  printf '%s #[fg=#414868]│ %s #[fg=#414868]│ %s%s#[default]' "$n" "$a" "$m" "$bat"
+  ;;
+--line)
+  ok=$'\e[38;2;158;206;106m●\e[0m' bad=$'\e[38;2;247;118;142m●\e[0m' dim=$'\e[38;2;86;95;137m' off=$'\e[0m'
+  dn=$bad da=$bad dm=$dim●$off
+  if [[ -n $ip4 ]]; then dn=$ok; fi
+  if [[ $ai != none ]]; then da=$ok; fi
+  if [[ $mnt != "not mounted" ]]; then dm=$ok; fi
+  line="$dn ${dim}network$off $net   $da ${dim}AI$off $ai   $dm ${dim}disk$off $mnt"
+  if [[ -n $battery ]]; then line="$line   ${dim}battery$off $battery"; fi
+  printf '%s\n' "$line"
   ;;
 *)
-  printf 'network:   %s\n' "${ip4:+${ssid:-ethernet} $ip4}${ip4:-offline}"
-  printf 'providers: %s\n' "${providers:-none}${inference:+ (local model available)}"
-  printf 'model:     %s\n' "${model:-not set}"
-  printf 'mount:     %s\n' "$mnt"
-  [[ -n $battery ]] && printf 'battery:   %s\n' "$battery"
+  printf 'network:  %s\n' "$net"
+  printf 'AI:       %s\n' "$ai"
+  printf 'disk:     %s\n' "$mnt"
+  if [[ -n $battery ]]; then printf 'battery:  %s\n' "$battery"; fi
   ;;
 esac
+exit 0

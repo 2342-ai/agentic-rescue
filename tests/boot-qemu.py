@@ -93,9 +93,13 @@ def main():
 
     ok = True
     try:
-        # Root autologin drops into tmux; the starship prompt ends with "›".
-        read_until(fd, [r"›", r"rescue.*login:", r"\$ $"], args.timeout, log)
-        time.sleep(2)
+        # Root autologin drops into tmux and opens the menu; Escape leaves it and
+        # prints the command overview.
+        read_until(fd, [r"What do you want to do"], args.timeout, log)
+        time.sleep(1.5)
+        os.write(fd, b"\x1b")
+        read_until(fd, [r"C-Space \?"], 30, log)
+        time.sleep(1)
         marker = "RESCUE_CHECK_%d" % int(time.time())
         # The marker is assembled by the shell so the echoed command line does not contain it.
         script = (
@@ -105,6 +109,9 @@ def main():
             "test -f /root/.config/opencode/opencode.json && echo OPENCODE_CONFIG_OK; "
             "test -f /root/.codex/config.toml && echo CODEX_CONFIG_OK; "
             "test -f /root/.claude/settings.json && echo CLAUDE_CONFIG_OK; "
+            "rescue-status >/dev/null; echo STATUS_EXIT=$?; "
+            "rescue welcome >/dev/null; echo WELCOME_EXIT=$?; "
+            "rescue help >/dev/null; echo HELP_EXIT=$?; "
             "ls /var/lib/iwd/ 2>/dev/null; "
             "systemctl --failed --no-legend | head -5; "
             "echo $M-END\n"
@@ -117,7 +124,10 @@ def main():
         checks = {"config service active": "SERVICE=active" in body,
                   "opencode config": "OPENCODE_CONFIG_OK" in body,
                   "codex config": "CODEX_CONFIG_OK" in body,
-                  "claude config": "CLAUDE_CONFIG_OK" in body}
+                  "claude config": "CLAUDE_CONFIG_OK" in body,
+                  "rescue-status exits 0": "STATUS_EXIT=0" in body,
+                  "welcome exits 0": "WELCOME_EXIT=0" in body,
+                  "help exits 0": "HELP_EXIT=0" in body}
         for kv in args.expect:
             checks[f"env {kv}"] = kv in body
         for name, passed in checks.items():

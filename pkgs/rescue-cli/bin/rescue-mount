@@ -47,6 +47,7 @@ unmount_all() {
     [[ -e $mapper ]] || continue
     cryptsetup close "${mapper##*/}" && say "Locked ${mapper##*/}."
   done
+  return 0
 }
 
 unlock_luks() {
@@ -178,6 +179,7 @@ mount_root() {
       mount -o "$mode" "$esp" "$target$dir" 2>/dev/null && say "  ESP $esp -> $dir" && break
     done
   fi
+  return 0
 }
 
 case $action in

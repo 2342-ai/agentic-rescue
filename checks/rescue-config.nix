@@ -60,6 +60,8 @@ runCommand "check-rescue-config"
     test "$(jq -r .env.ANTHROPIC_BASE_URL $cl)" = "https://2342.ai"
     test "$(jq -r .env.ANTHROPIC_AUTH_TOKEN $cl)" = k2342
     test -L $root/root/.claude/CLAUDE.md
+    test "$(jq -r '.projects."/root".hasTrustDialogAccepted' $root/root/.claude.json)" = true
+    test "$(jq -r '.projects."/mnt".hasTrustDialogAccepted' $root/root/.claude.json)" = true
 
     # Codex goes through 2342.ai with the responses wire API
     cx=$root/root/.codex/config.toml
@@ -67,6 +69,9 @@ runCommand "check-rescue-config"
     grep -q '^base_url = "https://2342.ai/v1"$' $cx
     grep -q '^wire_api = "responses"$' $cx
     grep -q '^env_key = "AI2342_API_KEY"$' $cx
+    grep -q '^\[projects."/root"\]$' $cx
+    # top-level keys must come before the first table
+    test "$(grep -n '^model_provider' $cx | cut -d: -f1)" -lt "$(grep -n '^\[' $cx | head -1 | cut -d: -f1)"
 
     # iwd: plain and hex-encoded SSID file names
     grep -q '^Passphrase=secret$' "$root/var/lib/iwd/Home Net.psk"

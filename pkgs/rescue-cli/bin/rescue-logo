@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""rescue-logo: the RESCUE wordmark in the 2342.ai blue-violet gradient.
+
+  rescue-logo           gradient logo (truecolor; tmux downsamples on plain consoles)
+  rescue-logo --plain   no colour
+"""
+import sys
+
+LOGO = [
+    "██████╗ ███████╗███████╗ ██████╗██╗   ██╗███████╗",
+    "██╔══██╗██╔════╝██╔════╝██╔════╝██║   ██║██╔════╝",
+    "██████╔╝█████╗  ███████╗██║     ██║   ██║█████╗  ",
+    "██╔══██╗██╔══╝  ╚════██║██║     ██║   ██║██╔══╝  ",
+    "██║  ██║███████╗███████║╚██████╗╚██████╔╝███████╗",
+    "╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝",
+]
+START, END = (47, 176, 255), (176, 109, 255)
+
+
+def color(t, dim):
+    r, g, b = (round(s + (e - s) * t) for s, e in zip(START, END))
+    if dim:
+        r, g, b = (round(c * 0.45) for c in (r, g, b))
+    return f"\x1b[38;2;{r};{g};{b}m"
+
+
+def main():
+    if "--plain" in sys.argv:
+        print("\n".join(LOGO))
+        return
+    width, height = len(LOGO[0]), len(LOGO)
+    for y, line in enumerate(LOGO):
+        out = []
+        for x, ch in enumerate(line):
+            if ch == " ":
+                out.append(" ")
+                continue
+            t = min(1.0, 0.85 * x / (width - 1) + 0.15 * y / (height - 1))
+            out.append(color(t, ch != "█") + ch)
+        print("  " + "".join(out) + "\x1b[0m")
+
+
+if __name__ == "__main__":
+    main()

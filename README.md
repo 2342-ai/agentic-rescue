@@ -52,19 +52,13 @@ nix run github:2342-ai/agentic-rescue#patch -- result/iso/*.iso \
 
 ## On the console
 
-```
-  Agentic Rescue                 wifi: Home 192.168.1.20 │ 2342ai/claude-sonnet-4-5 │ /mnt -
+The stick boots straight into this: the status of network, AI provider and disk, and a menu. Leaving the menu prints the command overview; `C-Space m` brings the menu back as a popup.
 
-  › Start agent
-    Connect AI provider
-    Wi-Fi
-    Mount installed system (read-only)
-    Enter installed system (chroot)
-    Share console to phone
-    Save keys on the stick (RESCUE_DATA)
-    Hardware overview
-    Shell
-```
+<p align="center"><img src="docs/screenshots/console.png" alt="Agentic Rescue console after boot: RESCUE logo, status line and menu" width="85%"></p>
+
+Agents start without sign-in or trust prompts when the slot has a key. `/root` and `/mnt` are pre-trusted for Claude Code and Codex, and opencode uses the same Tokyo Night colours as the console.
+
+<p align="center"><img src="docs/screenshots/opencode.png" alt="opencode started from the menu, using 2342.ai" width="85%"></p>
 
 | Command | What it does |
 |---|---|

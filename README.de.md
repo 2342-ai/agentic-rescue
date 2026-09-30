@@ -52,6 +52,12 @@ nix run github:2342-ai/agentic-rescue#patch -- result/iso/*.iso \
 
 ## An der Konsole
 
+Der Stick bootet direkt hierhin: Status von Netz, KI-Anbieter und Platte, darunter ein Menü. Wer das Menü verlässt, bekommt die Befehlsübersicht; `C-Space m` holt das Menü als Popup zurück.
+
+<p align="center"><img src="docs/screenshots/console.png" alt="Agentic-Rescue-Konsole nach dem Booten: RESCUE-Logo, Statuszeile und Menü" width="85%"></p>
+
+Mit einem Key im Slot starten die Agenten ohne Anmeldung und ohne Vertrauensabfrage. `/root` und `/mnt` sind für Claude Code und Codex vorab freigegeben, und opencode nutzt dieselben Tokyo-Night-Farben wie die Konsole.
+
 | Befehl | Was er tut |
 |---|---|
 | `rescue` | Das Menü. Auch `C-Space m` in tmux. |

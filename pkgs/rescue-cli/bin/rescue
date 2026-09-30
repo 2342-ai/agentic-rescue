@@ -1,70 +1,117 @@
 #!/usr/bin/env bash
-# rescue: the menu.
-#   rescue            interactive menu
-#   rescue welcome    banner and hints (shown once on the console)
-#   rescue agent [NAME]   start opencode, claude or codex
-#   rescue keys       tmux key reference
+# rescue: welcome screen and menu of the Agentic Rescue console.
+#   rescue              the menu
+#   rescue boot         first login on the console: welcome, then the menu
+#   rescue welcome      logo, one-line intro and status
+#   rescue help         the commands and keys, as shown when leaving the menu
+#   rescue agent [NAME] start opencode, claude or codex
 #   rescue --help
 set -euo pipefail
 
-BLUE="#7aa2f7"
-DIM="#565f89"
+POPUP=0
+if [[ ${RESCUE_POPUP:-} == 1 ]]; then POPUP=1; fi
 
-banner() {
-  gum style --foreground "$BLUE" --bold "$(figlet -f small "Agentic Rescue" 2>/dev/null || echo "AGENTIC RESCUE")"
-  local name
-  name=$(rescue-config get name 2>/dev/null || true)
-  [[ -n $name && $name != null ]] && gum style --foreground "$DIM" "$name"
-  gum style --foreground "$DIM" "Live system in RAM. Nothing outside mounted disks survives a reboot."
+C_DIM=$'\e[38;2;86;95;137m' C_TXT=$'\e[38;2;192;202;245m' C_KEY=$'\e[38;2;122;162;247m'
+C_ACC=$'\e[38;2;176;109;255m' C_OFF=$'\e[0m' C_BOLD=$'\e[1m'
+
+# gum look shared by every prompt.
+export GUM_CHOOSE_CURSOR="› " GUM_CHOOSE_CURSOR_FOREGROUND="#7aa2f7" GUM_CHOOSE_SELECTED_FOREGROUND="#7aa2f7"
+export GUM_CHOOSE_HEADER_FOREGROUND="#565f89" GUM_CHOOSE_ITEM_FOREGROUND="#c0caf5"
+export GUM_CONFIRM_PROMPT_FOREGROUND="#c0caf5" GUM_CONFIRM_SELECTED_BACKGROUND="#7aa2f7" GUM_CONFIRM_SELECTED_FOREGROUND="#1a1b26"
+export GUM_INPUT_CURSOR_FOREGROUND="#7aa2f7" GUM_INPUT_PROMPT_FOREGROUND="#7aa2f7"
+
+version() {
+  if [[ -r /iso/version.txt ]]; then cat /iso/version.txt; else echo dev; fi
 }
 
 welcome() {
-  banner
   echo
-  rescue-status
-  echo
-  gum style --foreground "$DIM" "rescue          menu            C-Space m"
-  gum style --foreground "$DIM" "rescue-mount    find and mount the installed system at /mnt (read-only)"
-  gum style --foreground "$DIM" "rescue-connect  connect an AI provider, or sign in to an agent"
-  gum style --foreground "$DIM" "opencode        talk to the agent    (also: claude, codex)"
-  gum style --foreground "$DIM" "impala          Wi-Fi                C-Space w"
-  gum style --foreground "$DIM" "rescue-share    console in a phone browser"
+  rescue-logo
+  local name
+  name=$(rescue-config get name 2>/dev/null || true)
+  if [[ -z $name || $name == null ]]; then name=""; else name=" · $name"; fi
+  printf '  %sagentic rescue%s %s· 2342.ai · v%s%s%s\n\n' "$C_ACC" "$C_OFF" "$C_DIM" "$(version)" "$name" "$C_OFF"
+  printf '  %sA live NixOS console with rescue tools and AI agents.%s\n' "$C_TXT" "$C_OFF"
+  printf '  %sNothing here touches your disks until you ask it to.%s\n\n' "$C_DIM" "$C_OFF"
+  printf '  '
+  rescue-status --line
   echo
 }
 
+show_help() {
+  local row
+  printf '  %s%sCommands%s\n' "$C_BOLD" "$C_TXT" "$C_OFF"
+  while IFS='|' read -r cmd what key; do
+    printf -v row '  %s%-25s%s %s%-50s%s %s%s%s' "$C_KEY" "$cmd" "$C_OFF" "$C_TXT" "$what" "$C_OFF" "$C_DIM" "$key" "$C_OFF"
+    printf '%s\n' "$row"
+  done <<'ROWS'
+rescue|this menu|C-Space m
+impala|connect to Wi-Fi (Ethernet just works)|C-Space w
+rescue-mount|find, unlock and mount the installed system|read-only
+rescue-enter|run a shell inside the installed system|chroot
+rescue-connect|add an API key, or sign in to an agent|C-Space k
+rescue-share|drive this console from a phone browser|C-Space s
+opencode  claude  codex|start an agent and describe what is broken|C-Space a
+ROWS
+  printf '\n  %s%-25s%s %s%-50s%s\n' "$C_KEY" "C-Space u" "$C_OFF" "$C_TXT" "send the last link on screen to your phone" "$C_OFF"
+  printf '  %s%-25s%s %s%-50s%s\n\n' "$C_KEY" "C-Space ?" "$C_OFF" "$C_TXT" "all keys" "$C_OFF"
+}
+
 keys() {
-  gum style --bold "tmux keys (prefix C-Space)"
-  cat <<'KEYS'
-  m   menu                       u   send the last link on screen to a phone
-  k   connect an AI provider     s   share this console in a browser
-  w   Wi-Fi (impala)             a   start the agent in a new window
-  |   split right                -   split down
-  c   new window                 n / p   next / previous window
-  d   detach (ssh: tmux attach -t rescue)
-KEYS
+  printf '  %s%sKeys%s %s(prefix C-Space)%s\n\n' "$C_BOLD" "$C_TXT" "$C_OFF" "$C_DIM" "$C_OFF"
+  while IFS=';' read -r k what; do
+    printf '  %s%-10s%s %s%s%s\n' "$C_KEY" "$k" "$C_OFF" "$C_TXT" "$what" "$C_OFF"
+  done <<'ROWS'
+m;menu
+a;start an agent in a new window
+k;connect an AI provider
+u;send the last link on screen to your phone
+s;share this console with a phone
+w;Wi-Fi (impala)
+c;new window
+n / p;next / previous window
+| / -;split right / down
+d;detach (over ssh: tmux attach -t rescue)
+ROWS
+  echo
+}
+
+pause() {
+  printf '\n  %sEnter: back to the menu%s ' "$C_DIM" "$C_OFF"
+  read -r _ || true
+}
+
+providers_configured() {
+  local state
+  state=$(rescue-config state 2>/dev/null || echo '{}')
+  jq -e '((.providers // []) | length > 0) or .inference == true' <<<"$state" >/dev/null
+}
+
+# Runs a command in the current pane, or in a new tmux window when the menu is a popup.
+run_here() {
+  local name=$1
+  shift
+  if ((POPUP)) && [[ -n ${TMUX:-} ]]; then
+    tmux new-window -n "$name" "$@"
+    exit 0
+  fi
+  "$@" || true
 }
 
 start_agent() {
   local agent=${1:-}
-  local state
-  state=$(rescue-config state)
-  [[ -n $agent ]] || agent=$(jq -r '.agent // "opencode"' <<<"$state")
-  local providers
-  providers=$(jq -r '.providers | length' <<<"$state")
-  local inference
-  inference=$(jq -r '.inference' <<<"$state")
-  if [[ $providers == 0 && $inference != true && $agent == opencode ]]; then
-    gum style --foreground 3 "No AI provider configured yet."
+  if [[ -z $agent ]]; then
+    agent=$(rescue-config state 2>/dev/null | jq -r '.agent // "opencode"')
+  fi
+  if [[ $agent != claude && $agent != codex ]] && ! providers_configured; then
+    gum style --foreground "#e0af68" "  No AI provider is configured yet."
     if gum confirm "Connect one now?"; then
-      rescue-connect
-    else
-      return 1
+      rescue-connect || true
     fi
+    providers_configured || return 0
   fi
   case $agent in
-  opencode) exec opencode ;;
-  claude) exec claude ;;
-  codex) exec codex ;;
+  opencode | claude | codex) run_here "$agent" "$agent" ;;
   *)
     echo "unknown agent: $agent" >&2
     return 1
@@ -73,60 +120,115 @@ start_agent() {
 }
 
 menu() {
+  local first=${1:-0} choice mounted agent
   while true; do
-    clear
-    banner
-    echo
-    rescue-status
-    echo
-    local mounted="Mount installed system (read-only)"
-    mountpoint -q /mnt && mounted="Unmount /mnt"
-    choice=$(gum choose --height 14 --cursor "› " \
-      "Start agent" \
-      "Connect AI provider" \
-      "Wi-Fi" \
+    if ((first)); then
+      first=0
+    else
+      clear
+      welcome
+    fi
+    mounted="Find and mount the installed system"
+    if mountpoint -q /mnt; then mounted="Unmount the installed system"; fi
+    choice=$(gum choose --height 13 --header "  What do you want to do?" \
+      "Talk to an agent" \
+      "Connect an AI provider" \
+      "Connect to Wi-Fi" \
       "$mounted" \
-      "Enter installed system (chroot)" \
-      "Share console to phone" \
-      "Save keys on the stick (RESCUE_DATA)" \
+      "Open a shell inside the installed system" \
+      "Share this console with a phone" \
+      "Save keys on this stick" \
       "Hardware overview" \
-      "Shell" \
+      "Exit to the shell" \
       "Reboot" \
-      "Power off") || exit 0
+      "Power off") || return 0
     case $choice in
-    "Start agent")
-      agent=$(gum choose "opencode" "claude" "codex") || continue
+    "Talk to an agent")
+      agent=$(gum choose --header "  Which agent?" "opencode" "claude" "codex") || continue
       start_agent "$agent"
       ;;
-    "Connect AI provider") rescue-connect ;;
-    "Wi-Fi") impala ;;
-    "Mount installed system (read-only)") rescue-mount; read -r -p "Enter to continue" ;;
-    "Unmount /mnt") rescue-mount --unmount; read -r -p "Enter to continue" ;;
-    "Enter installed system (chroot)")
-      if ! mountpoint -q /mnt; then rescue-mount || { read -r -p "Enter to continue"; continue; }; fi
-      if findmnt -n -o OPTIONS /mnt | grep -qw ro && gum confirm "Remount /mnt writable for repairs?"; then
+    "Connect an AI provider") rescue-connect || true ;;
+    "Connect to Wi-Fi") run_here wifi impala ;;
+    "Find and mount the installed system")
+      rescue-mount || true
+      pause
+      ;;
+    "Unmount the installed system")
+      rescue-mount --unmount || true
+      pause
+      ;;
+    "Open a shell inside the installed system")
+      if ! mountpoint -q /mnt; then
+        rescue-mount || { pause; continue; }
+      fi
+      if findmnt -n -o OPTIONS /mnt | grep -qw ro && gum confirm "Remount writable so repairs are possible?"; then
         rescue-mount --unmount && rescue-mount --rw
       fi
-      rescue-enter || true
+      run_here chroot rescue-enter
       ;;
-    "Share console to phone") rescue-share; read -r -p "Enter to continue" ;;
-    "Save keys on the stick (RESCUE_DATA)") rescue-persist; read -r -p "Enter to continue" ;;
-    "Hardware overview") fastfetch; inxi -Fxz 2>/dev/null | head -60; read -r -p "Enter to continue" ;;
-    "Shell") exit 0 ;;
-    "Reboot") gum confirm "Reboot now?" && { rescue-mount --unmount || true; systemctl reboot; } ;;
-    "Power off") gum confirm "Power off now?" && { rescue-mount --unmount || true; systemctl poweroff; } ;;
+    "Share this console with a phone")
+      rescue-share || true
+      pause
+      ;;
+    "Save keys on this stick")
+      rescue-persist || true
+      pause
+      ;;
+    "Hardware overview")
+      { fastfetch 2>/dev/null; inxi -Fxz 2>/dev/null; } | less -R
+      ;;
+    "Exit to the shell") return 0 ;;
+    "Reboot")
+      if gum confirm "Reboot now?"; then
+        rescue-mount --unmount >/dev/null 2>&1 || true
+        systemctl reboot
+      fi
+      ;;
+    "Power off")
+      if gum confirm "Power off now?"; then
+        rescue-mount --unmount >/dev/null 2>&1 || true
+        systemctl poweroff
+      fi
+      ;;
     esac
   done
 }
 
+# Give DHCP a moment on first boot so the status line is not "offline" for nothing.
+wait_for_network() {
+  local link carrier=0
+  for link in /sys/class/net/*; do
+    [[ ${link##*/} == lo ]] && continue
+    if [[ $(cat "$link/carrier" 2>/dev/null) == 1 ]]; then carrier=1; fi
+  done
+  ((carrier)) || return 0
+  for _ in $(seq 1 16); do
+    if ip -4 route get 1.1.1.1 >/dev/null 2>&1; then return 0; fi
+    sleep 0.5
+  done
+  return 0
+}
+
 case ${1:-menu} in
-menu) menu ;;
+menu)
+  menu 0
+  ;;
+boot)
+  wait_for_network
+  clear
+  welcome
+  menu 1
+  clear
+  welcome
+  show_help
+  ;;
 welcome) welcome ;;
-agent) start_agent "${2:-}" ;;
+help) show_help ;;
 keys) keys ;;
--h | --help) sed -n '2,7p' "$0" ;;
+agent) start_agent "${2:-}" ;;
+-h | --help) sed -n '2,8p' "$0" ;;
 *)
-  echo "unknown command: $1" >&2
+  echo "unknown command: $1 (try rescue --help)" >&2
   exit 1
   ;;
 esac

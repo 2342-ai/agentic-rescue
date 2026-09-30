@@ -33,7 +33,7 @@ let
 
   kmsconSettings = {
     font-name = "JetBrainsMono Nerd Font Mono";
-    font-size = 12;
+    font-size = 15;
     font-dpi = 96;
     sb-size = 10000;
     palette = "custom";
@@ -118,7 +118,7 @@ in
       fi
       if [ -n "$TMUX" ] && [ "$TMUX_PANE" = "%0" ] && [ ! -e /run/agentic-rescue/welcomed ]; then
         touch /run/agentic-rescue/welcomed 2>/dev/null
-        ${rescueCli}/bin/rescue welcome
+        ${rescueCli}/bin/rescue boot
       fi
       if [ -n "$SSH_CONNECTION" ] && [ -z "$TMUX" ]; then
         echo "Agentic Rescue. Attach to the console session with: tmux attach -t rescue"
