@@ -24,6 +24,7 @@
   --w: min(1120px, calc(100% - 40px));
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
 a { color: var(--blue); text-decoration: none; }
@@ -58,7 +59,7 @@ h3 { font-size: 18px; margin: 0 0 8px; font-weight: 600; }
 /* hero */
 .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; padding: 56px 0 72px; }
 .eyebrow { color: var(--muted); font-size: 14px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 18px; }
-h1 { font-size: clamp(48px, 6.6vw, 84px); line-height: .98; margin: 0 0 24px; }
+h1 { font-size: clamp(46px, 5.6vw, 76px); line-height: .98; margin: 0 0 24px; }
 h1 em { font-style: italic; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .06em; }
 .lead { color: var(--muted); font-size: 19px; max-width: 34em; margin: 0 0 30px; }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; }

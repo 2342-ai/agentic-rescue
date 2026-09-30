@@ -183,21 +183,23 @@
     if (pvd[0] !== 1 || ascii(pvd.subarray(1, 6)) !== "CD001") throw new Error("notiso");
     const dv = new DataView(pvd.buffer, pvd.byteOffset);
     const entries = await readDirectory(file, dv.getUint32(156 + 2, true), dv.getUint32(156 + 10, true));
-    const entry = entries.find((e) => !e.dir && e.name === "RESCUE_CONFIG.JSON");
-    if (!entry) throw new Error("noslot");
-    const offset = entry.lba * SECTOR;
-    const raw = await bytes(file, offset, offset + entry.size);
-    let current;
-    try {
-      current = JSON.parse(new TextDecoder().decode(raw).replace(/[\s\0]+$/, ""));
-    } catch (e) {
-      throw new Error("noslot");
+    // By name first (NixOS images keep the full name); otherwise any 16 KiB
+    // root file carrying the slot marker, for images written with 8.3 names.
+    const byName = entries.filter((e) => !e.dir && e.name === "RESCUE_CONFIG.JSON");
+    const bySize = entries.filter((e) => !e.dir && e.size === 16384 && !byName.includes(e));
+    let offset = null, length = null, current = null;
+    for (const entry of [...byName, ...bySize]) {
+      const raw = await bytes(file, entry.lba * SECTOR, entry.lba * SECTOR + entry.size);
+      try {
+        const parsed = JSON.parse(new TextDecoder().decode(raw).replace(/[\s\0]+$/, ""));
+        if (parsed && parsed.slot === "agentic-rescue-config-v1") { offset = entry.lba * SECTOR; length = entry.size; current = parsed; break; }
+      } catch (e) { /* not the slot */ }
     }
-    if (!current || current.slot !== "agentic-rescue-config-v1") throw new Error("noslot");
+    if (offset === null) throw new Error("noslot");
     let version = null;
     const ver = entries.find((e) => !e.dir && e.name === "VERSION.TXT");
     if (ver && ver.size < 256) version = new TextDecoder().decode(await bytes(file, ver.lba * SECTOR, ver.lba * SECTOR + ver.size)).trim();
-    return { offset, length: entry.size, current, version };
+    return { offset, length, current, version };
   }
 
   function patchedBlob(file, slot, config) {
