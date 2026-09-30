@@ -155,7 +155,7 @@ python3 -c 'import json,sys; d=json.dumps(json.load(open(sys.argv[1])),separator
 
 Two hosting modes, chosen in `web/config.js`:
 
-- **GitHub only** (`GITHUB_REPO` set, `RELEASE_BASE` null): the page lists the latest GitHub release through the API and links the ISO from the release assets. GitHub serves assets without CORS headers, so the browser cannot rewrite the image. The page saves your settings as `rescue-config.json` instead and shows the one-line patch command (`nix run ...#patch` or the standalone Python script). Assets are limited to 2 GiB, so only the online variant fits a release.
+- **GitHub only** (`GITHUB_REPO` set, `RELEASE_BASE` null, what rescue.2342.ai uses): the page lists the latest GitHub release through the API and starts the ISO as a normal browser download. GitHub serves assets without CORS headers, so the page cannot rewrite the image while it streams. Instead the downloaded ISO is dropped back onto the page: it finds the slot through the ISO9660 root directory and saves a configured copy built from lazy `Blob` slices, so nothing is loaded into memory and it takes seconds. Release assets are limited to 2 GiB, so only the online variant is attached to releases.
 - **CORS host** (`RELEASE_BASE` set): the ISO host serves `release-<variant>.json` and the images with `Access-Control-Allow-Origin` for the page. Then the browser streams, patches and verifies in one go. Any static host works; the build workflow uploads with rclone to an S3-compatible bucket when `RELEASE_BUCKET` and the `R2_*` secrets are set.
 
 The page itself is deployed to GitHub Pages at [rescue.2342.ai](https://rescue.2342.ai) by the `web` workflow.

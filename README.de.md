@@ -94,7 +94,7 @@ nix run github:2342-ai/agentic-rescue#patch -- rescue.iso --locate              
 
 Zwei Hosting-Modi, gewählt in `web/config.js`:
 
-- **Nur GitHub** (`GITHUB_REPO` gesetzt, `RELEASE_BASE` null): Die Seite listet das neueste GitHub-Release über die API und verlinkt die ISO aus den Release-Assets. GitHub liefert Assets ohne CORS-Header, der Browser darf das Image also nicht umschreiben. Stattdessen speichert die Seite deine Einstellungen als `rescue-config.json` und zeigt den Patch-Einzeiler (`nix run ...#patch` oder das eigenständige Python-Skript). Assets sind auf 2 GiB begrenzt, deshalb passt nur die Online-Variante in ein Release.
+- **Nur GitHub** (`GITHUB_REPO` gesetzt, `RELEASE_BASE` null, so läuft rescue.2342.ai): Die Seite listet das neueste GitHub-Release über die API und startet die ISO als normalen Browser-Download. GitHub liefert Assets ohne CORS-Header, die Seite kann das Image also nicht beim Streamen umschreiben. Stattdessen zieht man die fertige ISO zurück auf die Seite: Sie findet den Slot über das ISO9660-Wurzelverzeichnis und speichert eine konfigurierte Kopie aus Blob-Ausschnitten, ohne etwas in den Speicher zu laden. Das dauert Sekunden. Release-Assets sind auf 2 GiB begrenzt, deshalb hängt nur die Online-Variante am Release.
 - **CORS-Host** (`RELEASE_BASE` gesetzt): Der ISO-Host liefert `release-<variante>.json` und die Images mit `Access-Control-Allow-Origin` für die Seite. Dann streamt, patcht und verifiziert der Browser in einem Zug. Jeder statische Host geht; der Build-Workflow lädt per rclone in einen S3-kompatiblen Bucket, sobald `RELEASE_BUCKET` und die `R2_*`-Secrets gesetzt sind.
 
 Die Seite selbst wird vom `web`-Workflow auf GitHub Pages unter [rescue.2342.ai](https://rescue.2342.ai) veröffentlicht.
