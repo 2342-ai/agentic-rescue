@@ -62,7 +62,14 @@
       <p id="status"></p>
     </div>
 
-    <p class="fine" data-i18n="dl.fine">The key never leaves your browser. The page streams the image from the download server, replaces one 16 KiB block in place and hands the result to your disk. The original image's checksum is verified while it streams.</p>
+    <div class="manual" id="manual" hidden>
+      <p data-i18n="man.intro">The image is downloading from GitHub and your configuration was saved as <code>rescue-config.json</code>. GitHub does not let the browser rewrite the image, so run one of these in the folder with both files:</p>
+      <pre><code id="man-nix"></code></pre>
+      <pre><code id="man-py"></code></pre>
+      <p class="hint" data-i18n="man.note">Both write the configuration into the image in place. Then write it to a stick as usual.</p>
+    </div>
+
+    <p class="fine" id="fine" data-i18n="dl.fine">The key never leaves your browser. The page streams the image from the download server, replaces one 16 KiB block in place and hands the result to your disk. The original image's checksum is verified while it streams.</p>
   </section>
 
   <section id="how" class="text">

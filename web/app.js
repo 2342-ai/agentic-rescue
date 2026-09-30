@@ -31,13 +31,51 @@
   }
 
   async function loadReleases() {
-    for (const v of C.VARIANTS) {
-      try {
-        const r = await fetch(`${C.RELEASE_BASE}/release-${v.id}.json`, { cache: "no-store" });
-        if (r.ok) releases[v.id] = await r.json();
-      } catch (e) { /* offline page or not published yet */ }
+    if (C.RELEASE_BASE) {
+      for (const v of C.VARIANTS) {
+        try {
+          const r = await fetch(`${C.RELEASE_BASE}/release-${v.id}.json`, { cache: "no-store" });
+          if (r.ok) releases[v.id] = await r.json();
+        } catch (e) { /* not published yet */ }
+      }
     }
+    if (C.GITHUB_REPO) {
+      // The GitHub API allows CORS; release assets themselves do not.
+      try {
+        const r = await fetch(`https://api.github.com/repos/${C.GITHUB_REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+        if (r.ok) {
+          const rel = await r.json();
+          for (const v of C.VARIANTS) {
+            if (releases[v.id]) continue;
+            const asset = (rel.assets || []).find((a) => a.name.endsWith(".iso") && (v.id === "offline") === a.name.includes("offline"));
+            if (asset) releases[v.id] = { github: true, version: rel.tag_name.replace(/^v/, ""), iso: asset.name, size: asset.size, downloadUrl: asset.browser_download_url, page: rel.html_url };
+          }
+        }
+      } catch (e) { /* offline */ }
+    }
+    $("fine").textContent = t(C.RELEASE_BASE ? "dl.fine" : "dl.fine.github");
     render();
+  }
+
+  function saveBlob(name, text) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  }
+
+  function githubDownload(rel, cfg) {
+    const a = document.createElement("a");
+    a.href = rel.downloadUrl; a.download = rel.iso; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    if (!cfg) { status(t("st.github.plain"), "ok"); return; }
+    const full = Object.assign({ v: 1, slot: "agentic-rescue-config-v1" }, cfg);
+    saveBlob("rescue-config.json", JSON.stringify(full, null, 2) + "\n");
+    $("man-nix").textContent = `nix run github:${C.GITHUB_REPO}#patch -- ${rel.iso} --config rescue-config.json`;
+    $("man-py").textContent = `curl -fsSLO https://raw.githubusercontent.com/${C.GITHUB_REPO}/main/pkgs/patch-iso/agentic-rescue-patch\npython3 agentic-rescue-patch ${rel.iso} --config rescue-config.json`;
+    $("manual").hidden = false;
+    status(t("st.github"), "ok");
   }
 
   function config() {
@@ -62,9 +100,11 @@
     const cfg = withConfig ? config() : null;
     if (withConfig && !cfg.providers) return status(t("st.nokey"), "err");
     const rel = releases[variant];
-    if (!rel) return status(t("st.err", { msg: "release not published" }), "err");
-    $("go").disabled = true; $("plain").disabled = true;
+    if (!rel) return status(t("st.norelease"), "err");
     $("progress").hidden = false; $("bar").style.width = "0%";
+    $("manual").hidden = true;
+    if (rel.github) return githubDownload(rel, cfg);
+    $("go").disabled = true; $("plain").disabled = true;
     status(t("st.start"));
     const total = (rel.size / 1e6).toFixed(0);
     try {

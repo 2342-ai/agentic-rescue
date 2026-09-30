@@ -63,3 +63,6 @@ footer { display: flex; gap: 18px; padding: 24px 20px 40px; color: var(--dim); f
 footer a { color: var(--muted); }
 #version { margin-left: auto; }
 @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } nav a:not(:last-of-type) { display: none; } }
+.manual { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.manual p { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+.manual pre { margin: 8px 0; }

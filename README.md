@@ -153,7 +153,12 @@ python3 -c 'import json,sys; d=json.dumps(json.load(open(sys.argv[1])),separator
 
 `web/` is a static page without a framework. It fetches `release-<variant>.json`, streams the ISO through a `TransformStream` that swaps the slot bytes at the published offset, hashes the untouched bytes on the way through to verify the original against `sha256`, and writes the result via the File System Access API or a service worker download. The key exists in the browser tab and in the resulting file, nowhere else.
 
-The ISO host must send CORS headers. Cloudflare R2 with a custom domain does; the page reads `RELEASE_BASE` from `web/config.js`.
+Two hosting modes, chosen in `web/config.js`:
+
+- **GitHub only** (`GITHUB_REPO` set, `RELEASE_BASE` null): the page lists the latest GitHub release through the API and links the ISO from the release assets. GitHub serves assets without CORS headers, so the browser cannot rewrite the image. The page saves your settings as `rescue-config.json` instead and shows the one-line patch command (`nix run ...#patch` or the standalone Python script). Assets are limited to 2 GiB, so only the online variant fits a release.
+- **CORS host** (`RELEASE_BASE` set): the ISO host serves `release-<variant>.json` and the images with `Access-Control-Allow-Origin` for the page. Then the browser streams, patches and verifies in one go. Any static host works; the build workflow uploads with rclone to an S3-compatible bucket when `RELEASE_BUCKET` and the `R2_*` secrets are set.
+
+The page itself is deployed to GitHub Pages at [rescue.2342.ai](https://rescue.2342.ai) by the `web` workflow.
 
 ## Build it yourself
 

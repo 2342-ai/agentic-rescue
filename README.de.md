@@ -92,7 +92,12 @@ nix run github:2342-ai/agentic-rescue#patch -- rescue.iso --locate              
 
 `web/` ist eine statische Seite ohne Framework. Sie lädt `release-<variante>.json`, streamt die ISO durch einen `TransformStream`, der am veröffentlichten Offset die Slot-Bytes tauscht, hasht die unveränderten Bytes im Durchlauf, um das Original gegen `sha256` zu prüfen, und schreibt das Ergebnis über die File System Access API oder einen Service-Worker-Download. Der Key existiert im Browser-Tab und in der fertigen Datei, sonst nirgends.
 
-Der ISO-Host muss CORS-Header senden. Cloudflare R2 mit eigener Domain kann das; die Seite liest `RELEASE_BASE` aus `web/config.js`.
+Zwei Hosting-Modi, gewählt in `web/config.js`:
+
+- **Nur GitHub** (`GITHUB_REPO` gesetzt, `RELEASE_BASE` null): Die Seite listet das neueste GitHub-Release über die API und verlinkt die ISO aus den Release-Assets. GitHub liefert Assets ohne CORS-Header, der Browser darf das Image also nicht umschreiben. Stattdessen speichert die Seite deine Einstellungen als `rescue-config.json` und zeigt den Patch-Einzeiler (`nix run ...#patch` oder das eigenständige Python-Skript). Assets sind auf 2 GiB begrenzt, deshalb passt nur die Online-Variante in ein Release.
+- **CORS-Host** (`RELEASE_BASE` gesetzt): Der ISO-Host liefert `release-<variante>.json` und die Images mit `Access-Control-Allow-Origin` für die Seite. Dann streamt, patcht und verifiziert der Browser in einem Zug. Jeder statische Host geht; der Build-Workflow lädt per rclone in einen S3-kompatiblen Bucket, sobald `RELEASE_BUCKET` und die `R2_*`-Secrets gesetzt sind.
+
+Die Seite selbst wird vom `web`-Workflow auf GitHub Pages unter [rescue.2342.ai](https://rescue.2342.ai) veröffentlicht.
 
 ## Selbst bauen
 
