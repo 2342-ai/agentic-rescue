@@ -3,28 +3,164 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agentic Rescue · 2342.ai</title>
-<meta name="description" content="A NixOS rescue stick with opencode, Claude Code and Codex inside. Pick a provider, download, boot, repair. One 2342.ai key drives all three agents.">
+<title>Agentic Rescue: Linux rescue USB with AI agents · 2342.ai</title>
+<meta name="description" content="Free Linux rescue USB with opencode, Claude Code and Codex built in. Boot the PC that will not start and let an agent find the cause. A SystemRescue alternative.">
 <meta name="theme-color" content="#070a18">
 <link rel="canonical" href="https://rescue.2342.ai/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="2342.ai">
 <meta property="og:url" content="https://rescue.2342.ai/">
-<meta property="og:title" content="Agentic Rescue: a rescue stick with an AI agent inside">
+<meta property="og:title" content="Agentic Rescue: a Linux rescue USB with an AI agent inside">
 <meta property="og:description" content="NixOS live system with opencode, Claude Code and Codex. Your key goes into the image before it ever boots. Mount, diagnose, repair.">
 <meta property="og:image" content="https://rescue.2342.ai/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Agentic Rescue by 2342.ai: terminal with an agent diagnosing a broken boot">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Agentic Rescue: a rescue stick with an AI agent inside">
+<meta name="twitter:title" content="Agentic Rescue: a Linux rescue USB with an AI agent inside">
 <meta name="twitter:description" content="NixOS live system with opencode, Claude Code and Codex. Mount, diagnose, repair.">
 <meta name="twitter:image" content="https://rescue.2342.ai/og.png">
+<meta name="twitter:image:alt" content="Agentic Rescue by 2342.ai: terminal with an agent diagnosing a broken boot">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="alternate" type="text/plain" href="https://rescue.2342.ai/llms.txt" title="llms.txt">
 <link rel="icon" href="assets/2342-rocket.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "Organization",
+   "@id": "https://2342.ai/#org",
+   "name": "2342.ai",
+   "url": "https://2342.ai",
+   "logo": "https://rescue.2342.ai/assets/apple-touch-icon.png",
+   "sameAs": [
+    "https://github.com/2342-ai"
+   ]
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://rescue.2342.ai/#website",
+   "url": "https://rescue.2342.ai/",
+   "name": "Agentic Rescue",
+   "inLanguage": "en",
+   "publisher": {
+    "@id": "https://2342.ai/#org"
+   }
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://rescue.2342.ai/#app",
+   "name": "Agentic Rescue",
+   "description": "Free Linux rescue USB: a NixOS live ISO with the AI agents opencode, Claude Code and Codex built in, for diagnosing and repairing systems that will not boot.",
+   "applicationCategory": "UtilitiesApplication",
+   "applicationSubCategory": "System rescue and recovery",
+   "operatingSystem": "Boots on x86_64 PCs with UEFI or BIOS",
+   "url": "https://rescue.2342.ai/",
+   "downloadUrl": "https://github.com/2342-ai/agentic-rescue/releases/latest",
+   "softwareHelp": {
+    "@type": "CreativeWork",
+    "url": "https://rescue.2342.ai/fix-linux-not-booting/"
+   },
+   "screenshot": "https://rescue.2342.ai/screens/console.png",
+   "license": "https://opensource.org/licenses/MIT",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "EUR"
+   },
+   "featureList": [
+    "opencode, Claude Code and Codex preinstalled",
+    "API key written into the ISO in the browser",
+    "LUKS, LVM, mdadm, ZFS, Btrfs, ext4, XFS and NTFS support",
+    "Read-only mount by default",
+    "QR code handoff to a phone for keys and sign-ins"
+   ],
+   "publisher": {
+    "@id": "https://2342.ai/#org"
+   },
+   "sameAs": [
+    "https://github.com/2342-ai/agentic-rescue"
+   ]
+  },
+  {
+   "@type": "FAQPage",
+   "@id": "https://rescue.2342.ai/#faq",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "What is Agentic Rescue?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "A free, bootable Linux rescue system for a USB stick. It is a NixOS live ISO with the AI coding agents opencode, Claude Code and Codex installed, next to the usual rescue tools: ddrescue, testdisk, smartctl, cryptsetup, ZFS, Btrfs, LVM and mdadm."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How is it different from SystemRescue (SystemRescueCd)?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "SystemRescue is the classic Arch-based rescue toolkit with GParted and an optional graphical desktop. Agentic Rescue is NixOS-based, console-only, and adds three AI agents that read the logs of the broken system, explain what they find and propose repairs. If you want a graphical partition editor, use SystemRescue. If you want help finding the cause, use Agentic Rescue."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is it free? Do I need an AI subscription?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The ISO is free and MIT licensed. The agents need a model: bring an API key (Groq, Google AI Studio and OpenRouter have free tiers), use one 2342.ai key for all three agents, or sign in with an existing Claude or ChatGPT subscription at the console."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Which systems can it repair?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Linux installs of any distribution: NixOS, Arch and its derivatives, Debian, Ubuntu and Fedora, encrypted with LUKS or not, on ext4, Btrfs, XFS or ZFS. For Windows it can mount NTFS, copy files off the disk and reset local passwords with chntpw, but it does not run Windows repair tools."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does it work without internet?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The published image needs a network connection for the agents. Ethernet works automatically, Wi-Fi is set up with impala or written into the image on this page. An offline variant with a local language model can be built from source with nix build .#iso-offline."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does it boot with Secure Boot enabled?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Not yet. The image is not signed for Secure Boot. Switch Secure Boot off in the firmware settings to boot the stick, and switch it back on when you are done."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is my API key safe?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The key never leaves your browser: the page writes it into your own copy of the image. On the stick it is stored in plain text, so whoever holds the stick holds the key. Create a key just for the stick and give it a budget."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How do I put the ISO on a USB stick?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "With any tool that writes disk images: dd on Linux and macOS, balenaEtcher, Rufus in DD image mode, or Ventoy. The stick needs at least 4 GB."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -53,9 +189,9 @@
 <main>
   <section class="hero">
     <div class="hero-text">
-      <p class="eyebrow" data-i18n="hero.eyebrow">NixOS live system · opencode · Claude Code · Codex</p>
-      <h1 data-i18n-html="hero.title">A rescue stick<br>with an <em>agent</em> inside.</h1>
-      <p class="lead" data-i18n="hero.lead">Boot it on the machine that will not start. The agent mounts the installed system read-only, reads the logs with you and asks before it changes anything. Your key goes into the image before it ever boots.</p>
+      <p class="eyebrow" data-i18n="hero.eyebrow">Linux rescue USB · NixOS live ISO · opencode · Claude Code · Codex</p>
+      <h1 data-i18n-html="hero.title">A Linux rescue stick<br>with an <em>agent</em> inside.</h1>
+      <p class="lead" data-i18n="hero.lead">Agentic Rescue is a free Linux rescue USB with opencode, Claude Code and Codex built in. Boot it on the machine that will not start: the agent mounts the installed system read-only, reads the logs with you and asks before it changes anything.</p>
       <div class="cta">
         <a class="btn primary" href="#download"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg><span data-i18n="hero.cta">Get the ISO</span></a>
         <a class="btn ghost" href="https://github.com/2342-ai/agentic-rescue" rel="noopener" data-i18n="hero.source">Source on GitHub</a>
@@ -178,6 +314,8 @@
         <h3 data-i18n="s2.t">Download the image</h3>
         <div class="variants" id="variants"></div>
         <button class="btn primary big" id="go"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg><span id="go-label" data-i18n="s2.go">Download ISO</span></button>
+        <p class="hint"><span data-i18n="s2.direct">Or get it straight from</span> <a href="https://github.com/2342-ai/agentic-rescue/releases/latest" rel="noopener">GitHub Releases</a>.</p>
+        <noscript><p class="hint">JavaScript is off: download the ISO from <a href="https://github.com/2342-ai/agentic-rescue/releases/latest">GitHub Releases</a> and add your key at the console or with <code>nix run github:2342-ai/agentic-rescue#patch</code>.</p></noscript>
         <div class="dlstate" id="dlstate" hidden>
           <div class="bar"><div id="bar"></div></div>
           <div class="dlinfo"><span class="spinner" id="spinner"></span><p id="status"></p></div>
@@ -237,6 +375,26 @@
     <p class="hint" data-i18n="pt.note">Claude Code and Codex also accept their own subscription sign-in at the console.</p>
   </section>
 
+  <section class="guide-teaser">
+    <a href="fix-linux-not-booting/" class="teaser">
+      <span class="teaser-kicker" data-i18n="gt.kicker">Guide</span>
+      <span class="teaser-title" data-i18n="gt.title">Linux not booting? How to find the cause and fix it</span>
+      <span class="teaser-text" data-i18n="gt.text">The checks a rescue agent runs, step by step: disk health, journal, package log, initramfs and bootloader, per distribution.</span>
+    </a>
+  </section>
+
+  <section class="faq" id="faq">
+    <h2 data-i18n="faq.title">Questions</h2>
+    <details open><summary data-i18n="faq.q1">What is Agentic Rescue?</summary><p data-i18n="faq.a1">A free, bootable Linux rescue system for a USB stick. It is a NixOS live ISO with the AI coding agents opencode, Claude Code and Codex installed, next to the usual rescue tools: ddrescue, testdisk, smartctl, cryptsetup, ZFS, Btrfs, LVM and mdadm.</p></details>
+    <details><summary data-i18n="faq.q2">How is it different from SystemRescue (SystemRescueCd)?</summary><p data-i18n="faq.a2">SystemRescue is the classic Arch-based rescue toolkit with GParted and an optional graphical desktop. Agentic Rescue is NixOS-based, console-only, and adds three AI agents that read the logs of the broken system, explain what they find and propose repairs. If you want a graphical partition editor, use SystemRescue. If you want help finding the cause, use Agentic Rescue.</p></details>
+    <details><summary data-i18n="faq.q3">Is it free? Do I need an AI subscription?</summary><p data-i18n="faq.a3">The ISO is free and MIT licensed. The agents need a model: bring an API key (Groq, Google AI Studio and OpenRouter have free tiers), use one 2342.ai key for all three agents, or sign in with an existing Claude or ChatGPT subscription at the console.</p></details>
+    <details><summary data-i18n="faq.q4">Which systems can it repair?</summary><p data-i18n="faq.a4">Linux installs of any distribution: NixOS, Arch and its derivatives, Debian, Ubuntu and Fedora, encrypted with LUKS or not, on ext4, Btrfs, XFS or ZFS. For Windows it can mount NTFS, copy files off the disk and reset local passwords with chntpw, but it does not run Windows repair tools.</p></details>
+    <details><summary data-i18n="faq.q5">Does it work without internet?</summary><p data-i18n="faq.a5">The published image needs a network connection for the agents. Ethernet works automatically, Wi-Fi is set up with impala or written into the image on this page. An offline variant with a local language model can be built from source with nix build .#iso-offline.</p></details>
+    <details><summary data-i18n="faq.q6">Does it boot with Secure Boot enabled?</summary><p data-i18n="faq.a6">Not yet. The image is not signed for Secure Boot. Switch Secure Boot off in the firmware settings to boot the stick, and switch it back on when you are done.</p></details>
+    <details><summary data-i18n="faq.q7">Is my API key safe?</summary><p data-i18n="faq.a7">The key never leaves your browser: the page writes it into your own copy of the image. On the stick it is stored in plain text, so whoever holds the stick holds the key. Create a key just for the stick and give it a budget.</p></details>
+    <details><summary data-i18n="faq.q8">How do I put the ISO on a USB stick?</summary><p data-i18n="faq.a8">With any tool that writes disk images: dd on Linux and macOS, balenaEtcher, Rufus in DD image mode, or Ventoy. The stick needs at least 4 GB.</p></details>
+  </section>
+
   <section class="build" id="build">
     <h2 data-i18n="build.title">Build it yourself</h2>
     <p data-i18n="build.p">One Nix flake. Build the image, patch the slot, or bake your configuration in at build time.</p>
@@ -251,6 +409,7 @@ nix run github:2342-ai/agentic-rescue#patch -- result/iso/*.iso \
   <div class="foot-links">
     <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
     <a href="https://github.com/2342-ai/agentic-rescue/releases" rel="noopener" data-i18n="foot.releases">Releases</a>
+    <a href="fix-linux-not-booting/" data-i18n="foot.guide">Linux not booting?</a>
     <a href="https://2342.ai/en/imprint" rel="noopener" data-i18n="foot.imprint">Imprint</a>
     <span id="version"></span>
   </div>

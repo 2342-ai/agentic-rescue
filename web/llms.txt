@@ -1,0 +1,28 @@
+# Agentic Rescue
+
+> Agentic Rescue is a free, open source (MIT) Linux rescue USB by 2342.ai: a NixOS live ISO with the AI coding agents opencode, Claude Code and Codex built in. Boot it on a machine that will not start; the agent mounts the installed system read-only, reads its logs, explains the cause and proposes repairs, asking before anything destructive.
+
+Key facts:
+
+- Boots on x86_64 PCs with UEFI or BIOS. Not signed for Secure Boot yet; switch Secure Boot off to boot it.
+- Console only (kmscon + tmux), with a menu at boot. No graphical desktop.
+- Rescue tools: ddrescue, testdisk, photorec, smartctl, nvme-cli, cryptsetup (LUKS), LVM, mdadm, ZFS, Btrfs, ext4, XFS, NTFS, exFAT, efibootmgr, chntpw, arch-chroot, nixos-enter.
+- `rescue-mount` finds, unlocks and mounts the installed system read-only at /mnt; `rescue-enter` chroots into it.
+- AI providers: one 2342.ai key drives all three agents (OpenAI-compatible, Responses and Anthropic Messages APIs). Groq, Google AI Studio, OpenRouter and OpenCode Zen (free tiers), Anthropic and OpenAI keys also work. Claude and ChatGPT subscribers can sign in at the console via a QR code on their phone.
+- The download page writes the API key, Wi-Fi and SSH key into a 16 KiB configuration slot inside the ISO, in the browser. The key is never uploaded; it is stored in plain text on the stick.
+- Compared with SystemRescue (formerly SystemRescueCd): SystemRescue is Arch-based with GParted and an optional desktop; Agentic Rescue is NixOS-based, console-only, and adds AI agents that diagnose the broken system.
+- Built from one Nix flake; the image, the patch tool and the offline variant with a local model can be built from source.
+
+## Pages
+
+- [Agentic Rescue: download and overview](https://rescue.2342.ai/): what it is, how the key gets into the image, providers, FAQ
+- [Linux not booting? How to find the cause and fix it](https://rescue.2342.ai/fix-linux-not-booting/): step-by-step guide with commands for Arch, Debian, Ubuntu, Fedora and NixOS
+
+## Source and downloads
+
+- [GitHub repository](https://github.com/2342-ai/agentic-rescue): source, README, configuration slot format
+- [Latest release](https://github.com/2342-ai/agentic-rescue/releases/latest): ISO and release.json
+
+## Optional
+
+- [2342.ai](https://2342.ai): one access for current AI models with visible data paths and one budget

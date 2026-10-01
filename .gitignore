@@ -3,3 +3,4 @@ result-*
 *.iso
 .direnv/
 __pycache__/
+.codex/

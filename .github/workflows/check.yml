@@ -25,6 +25,7 @@ jobs:
       - name: Fast checks
         run: |
           nix build -L .#checks.x86_64-linux.shellcheck .#checks.x86_64-linux.rescue-config .#checks.x86_64-linux.patch-tool
-      - name: Web syntax
+      - name: Web syntax and SEO checks
         run: |
           for f in web/*.js; do node --check "$f"; done
+          node tests/web-seo.mjs

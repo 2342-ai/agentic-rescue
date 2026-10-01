@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linux not booting? How to find the cause and fix it · Agentic Rescue</title>
+<meta name="description" content="Linux will not boot after an update? Check the disk, read the journal, then rebuild initramfs and bootloader from a rescue USB. Commands for Arch, Debian, Fedora, NixOS.">
+<meta name="theme-color" content="#070a18">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://rescue.2342.ai/fix-linux-not-booting/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="2342.ai">
+<meta property="og:url" content="https://rescue.2342.ai/fix-linux-not-booting/">
+<meta property="og:title" content="Linux not booting? How to find the cause and fix it">
+<meta property="og:description" content="Linux will not boot after an update? Check the disk, read the journal, then rebuild initramfs and bootloader from a rescue USB. Commands for Arch, Debian, Fedora, NixOS.">
+<meta property="og:image" content="https://rescue.2342.ai/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://rescue.2342.ai/og.png">
+<link rel="icon" href="../assets/2342-rocket.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preload" href="../fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../style.css">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "TechArticle",
+   "@id": "https://rescue.2342.ai/fix-linux-not-booting/#article",
+   "headline": "Linux not booting? How to find the cause and fix it",
+   "description": "Linux will not boot after an update? Check the disk, read the journal, then rebuild initramfs and bootloader from a rescue USB. Commands for Arch, Debian, Fedora, NixOS.",
+   "url": "https://rescue.2342.ai/fix-linux-not-booting/",
+   "inLanguage": "en",
+   "datePublished": "2026-10-01",
+   "dateModified": "2026-10-01",
+   "author": {
+    "@type": "Organization",
+    "@id": "https://2342.ai/#org",
+    "name": "2342.ai",
+    "url": "https://2342.ai"
+   },
+   "publisher": {
+    "@id": "https://2342.ai/#org"
+   },
+   "image": "https://rescue.2342.ai/og.png",
+   "about": {
+    "@id": "https://rescue.2342.ai/#app"
+   },
+   "mainEntityOfPage": "https://rescue.2342.ai/fix-linux-not-booting/"
+  },
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Agentic Rescue",
+     "item": "https://rescue.2342.ai/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Linux not booting",
+     "item": "https://rescue.2342.ai/fix-linux-not-booting/"
+    }
+   ]
+  },
+  {
+   "@type": "FAQPage",
+   "@id": "https://rescue.2342.ai/fix-linux-not-booting/#faq",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "Will I lose data when I repair a system that does not boot?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Not if you work read-only first. Mounting read-only, reading logs and checking SMART data changes nothing. Data is at risk from repair runs of fsck or btrfs check, from partitioning tools, and from writing to a failing disk. Copy what matters off the disk before any of those."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Do I have to reinstall Linux?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Rarely. A failed initramfs, a lost bootloader entry or a wrong fstab line are fixed with one or two commands from a chroot. Reinstalling is the answer when the disk itself is failing, and then only after imaging it."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Why does Linux stop booting after an update?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Because an update rebuilds the initramfs and the bootloader configuration. If /boot runs out of space, a kernel module is missing, or the update was interrupted, the new kernel has nothing usable to start with. The package manager's log shows which step failed."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2fb0ff"/><stop offset="1" stop-color="#b06dff"/></linearGradient></defs></svg>
+<div class="glow" aria-hidden="true"></div>
+<header class="top">
+  <div class="brand">
+    <a href="https://2342.ai" class="logo" rel="noopener"><img src="../assets/2342-rocket.svg" alt="" width="30" height="30"><span>2342.ai</span></a>
+    <span class="slash">/</span>
+    <a href="../" class="product">Rescue</a>
+  </div>
+  <nav>
+    <a href="../#download">Download</a>
+    <a href="../#faq">Questions</a>
+    <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener" class="gh" aria-label="GitHub"><svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+  </nav>
+</header>
+<main class="article">
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Agentic Rescue</a> <span>/</span> Linux not booting</nav>
+  <h1>Linux not booting? How to find the cause and fix it</h1>
+  <p class="answer"><b>Short answer.</b> Most Linux boot failures after an update come from four things: an initramfs that failed to build (often because /boot was full), a missing bootloader entry, a changed disk UUID in /etc/fstab, or a failing disk. Boot a rescue USB, mount the installed system read-only, read the last boot's journal and the package log, then rebuild the initramfs and bootloader from a chroot. Check the disk's health first: never run repairs on a disk that is failing.</p>
+
+  <h2>Step by step</h2>
+  <ol class="steps-list">
+      <li><h3>Boot a rescue system and stay read-only</h3><p>Start the machine from a rescue USB stick instead of the installed system. Agentic Rescue mounts nothing writable on its own. Until you know the cause, keep it that way.</p></li>
+      <li><h3>Check the disk before anything else</h3><p>Read the SMART data and look for I/O errors in the kernel log. If the disk reports reallocated or pending sectors, or <code>dmesg</code> shows I/O errors, stop here and image the disk to another one with ddrescue before any repair.</p><pre><code>smartctl -a /dev/nvme0n1
+dmesg | grep -iE 'i/o error|ata[0-9].*error|nvme.*error'
+ddrescue -d /dev/nvme0n1 /media/backup/disk.img /media/backup/disk.map</code></pre></li>
+      <li><h3>Find, unlock and mount the installed system</h3><p>Unlock LUKS, activate LVM and RAID, import ZFS pools, then mount the root filesystem read-only. For Btrfs, mount the root subvolume (often <code>@</code>). On Agentic Rescue, <code>rescue-mount</code> does all of this and mounts at <code>/mnt</code>.</p><pre><code>cryptsetup open /dev/nvme0n1p2 root
+vgchange -ay
+mount -o ro,subvol=@ /dev/mapper/root /mnt</code></pre></li>
+      <li><h3>Read the journal of the failed boot</h3><p>The installed system's journal usually names the problem: a missing module, a filesystem that could not be mounted, a unit that failed. List the boots and read the warnings of the last one.</p><pre><code>journalctl -D /mnt/var/log/journal --list-boots
+journalctl -D /mnt/var/log/journal -b -1 -p warning</code></pre></li>
+      <li><h3>See what changed</h3><p>The package manager's log shows what the last update installed and whether a hook failed. Look for errors right after a kernel update, and check whether <code>/boot</code> is full.</p><pre><code>tail -n 80 /mnt/var/log/pacman.log            # Arch and derivatives
+less /mnt/var/log/apt/history.log             # Debian, Ubuntu
+df -h /mnt/boot</code></pre></li>
+      <li><h3>Match the cause</h3><ul><li><b>initramfs missing or broken</b>: rebuild it (step 7). Free space on <code>/boot</code> first if it is full.</li><li><b>Bootloader entry missing</b>: check <code>efibootmgr -v</code>, then reinstall or update the bootloader.</li><li><b>fstab points at a UUID that no longer exists</b>: compare <code>blkid</code> with <code>/mnt/etc/fstab</code> and fix the line.</li><li><b>Filesystem errors</b>: check without writing first: <code>e2fsck -n</code>, <code>btrfs check --readonly</code>, <code>xfs_repair -n</code>.</li><li><b>NixOS</b>: pick the previous generation in the boot menu. It is still there.</li></ul></li>
+      <li><h3>Repair from a chroot</h3><p>Remount writable, back up every file before you edit it, enter the installed system and rebuild with its own tools. <code>arch-chroot</code> works for any distribution; on NixOS use <code>nixos-enter</code>.</p><pre><code>mount -o remount,rw /mnt
+arch-chroot /mnt</code></pre></li>
+  </ol>
+
+  <h2>Rebuild commands by distribution</h2>
+  <p>Run these inside the chroot from step 7.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Distribution</th><th>initramfs</th><th>Bootloader</th></tr></thead>
+      <tbody>
+        <tr><td>Arch, EndeavourOS, CachyOS</td><td><code>mkinitcpio -P</code></td><td><code>grub-mkconfig -o /boot/grub/grub.cfg  or  bootctl update</code></td></tr>
+        <tr><td>Debian, Ubuntu, Mint</td><td><code>update-initramfs -u -k all</code></td><td><code>update-grub</code></td></tr>
+        <tr><td>Fedora</td><td><code>dracut --regenerate-all --force</code></td><td><code>grub2-mkconfig -o /boot/grub2/grub.cfg</code></td></tr>
+        <tr><td>NixOS</td><td><code>built with the system</code></td><td><code>nixos-rebuild boot  (inside nixos-enter)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Then leave the chroot, run <code>sync</code>, unmount everything under <code>/mnt</code> and reboot.</p>
+
+  <aside class="cta-box">
+    <h2>Let an agent do the reading</h2>
+    <p>Agentic Rescue is a free Linux rescue USB with opencode, Claude Code and Codex built in. The agents follow exactly these steps: read-only first, disk health before repairs, a backup of every file before it is edited, and nothing destructive without your yes.</p>
+    <a class="btn primary" href="../#download">Get the rescue stick</a>
+  </aside>
+
+  <section class="faq" id="faq">
+    <h2>Questions</h2>
+      <details><summary>Will I lose data when I repair a system that does not boot?</summary><p>Not if you work read-only first. Mounting read-only, reading logs and checking SMART data changes nothing. Data is at risk from repair runs of fsck or btrfs check, from partitioning tools, and from writing to a failing disk. Copy what matters off the disk before any of those.</p></details>
+      <details><summary>Do I have to reinstall Linux?</summary><p>Rarely. A failed initramfs, a lost bootloader entry or a wrong fstab line are fixed with one or two commands from a chroot. Reinstalling is the answer when the disk itself is failing, and then only after imaging it.</p></details>
+      <details><summary>Why does Linux stop booting after an update?</summary><p>Because an update rebuilds the initramfs and the bootloader configuration. If /boot runs out of space, a kernel module is missing, or the update was interrupted, the new kernel has nothing usable to start with. The package manager's log shows which step failed.</p></details>
+  </section>
+</main>
+<footer>
+  <div class="foot-brand"><img src="../assets/2342-rocket.svg" alt="" width="22" height="22"><span>Agentic Rescue is made by <a href="https://2342.ai" rel="noopener">2342.ai</a> and <a href="https://anycast.io" rel="noopener">anycast.io</a></span></div>
+  <div class="foot-links">
+    <a href="../">Agentic Rescue</a>
+    <a href="https://github.com/2342-ai/agentic-rescue" rel="noopener">GitHub</a>
+    <a href="https://2342.ai/en/imprint" rel="noopener">Imprint</a>
+  </div>
+</footer>
+</body>
+</html>
