@@ -98,6 +98,16 @@ h1 em { font-style: italic; background: var(--grad); -webkit-background-clip: te
 .features svg { width: 30px; height: 30px; fill: none; stroke: url(#g); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 14px; }
 .features p { color: var(--muted); font-size: 15.5px; margin: 0; }
 
+/* screenshots */
+.screens { margin-bottom: 96px; }
+.shot { margin: 0; background: #1a1b26; border: 1px solid var(--line2); border-radius: 16px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, .45), 0 0 60px rgba(114, 0, 199, .12); }
+.shot img { display: block; width: 100%; height: auto; }
+.shot-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; background: #0b1628; border-bottom: 1px solid var(--line); }
+.shot-bar span { width: 10px; height: 10px; border-radius: 50%; background: #2a3550; }
+.shot-bar em { margin-left: 8px; color: var(--dim); font: 12px var(--mono); font-style: normal; }
+.shot figcaption { padding: 13px 18px; color: var(--muted); font-size: 14.5px; background: #0b1628; border-top: 1px solid var(--line); }
+.shot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+
 /* download */
 .download { background: linear-gradient(180deg, rgba(14, 27, 49, .85), rgba(10, 21, 38, .85)); border: 1px solid var(--line2); border-radius: 26px; padding: 44px; margin-bottom: 96px; position: relative; box-shadow: 0 40px 120px rgba(0, 0, 0, .35); }
 .download::before { content: ""; position: absolute; inset: -1px; border-radius: 26px; padding: 1px; background: linear-gradient(120deg, rgba(47, 176, 255, .5), transparent 40%, transparent 60%, rgba(176, 109, 255, .5)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
@@ -187,6 +197,7 @@ footer { width: var(--w); margin: 0 auto; display: flex; justify-content: space-
   .hero { grid-template-columns: 1fr; gap: 36px; padding-top: 28px; }
   .features { grid-template-columns: 1fr 1fr; }
   .how ol { grid-template-columns: 1fr; }
+  .shot-row { grid-template-columns: 1fr; }
   .term-body { font-size: 12px; }
 }
 @media (max-width: 620px) {

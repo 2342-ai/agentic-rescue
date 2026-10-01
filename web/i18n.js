@@ -1,6 +1,11 @@
 window.I18N = {
   en: {
-    "nav.download": "Download", "nav.how": "How it works", "nav.build": "Build",
+    "nav.download": "Download", "nav.how": "How it works", "nav.build": "Build", "nav.screens": "Screenshots",
+    "sc.title": "What you see after boot",
+    "sc.sub": "Real screenshots of v0.1.0 in a VM. No desktop, no installer: a console that is ready to work.",
+    "sc.c1": "Boot, and the menu is there. Network, AI provider and disk at a glance.",
+    "sc.c2": "No key in the image? Scan the QR code and type it on your phone.",
+    "sc.c3": "One keypress to an agent. No sign-in, no trust prompts.",
     "hero.eyebrow": "NixOS live system · opencode · Claude Code · Codex",
     "hero.title": "A rescue stick<br>with an <em>agent</em> inside.",
     "hero.lead": "Boot it on the machine that will not start. The agent mounts the installed system read-only, reads the logs with you and asks before it changes anything. Your key goes into the image before it ever boots.",
@@ -53,7 +58,12 @@ window.I18N = {
     "st.nostream": "This browser cannot stream a download to disk. Use Chrome, Edge or Firefox.",
   },
   de: {
-    "nav.download": "Download", "nav.how": "So funktioniert es", "nav.build": "Selbst bauen",
+    "nav.download": "Download", "nav.how": "So funktioniert es", "nav.build": "Selbst bauen", "nav.screens": "Screenshots",
+    "sc.title": "Was du nach dem Booten siehst",
+    "sc.sub": "Echte Screenshots von v0.1.0 in einer VM. Kein Desktop, kein Installer: eine Konsole, die sofort arbeitsbereit ist.",
+    "sc.c1": "Booten, und das Menü ist da. Netz, KI-Anbieter und Platte auf einen Blick.",
+    "sc.c2": "Kein Key im Image? QR-Code scannen und am Handy eintippen.",
+    "sc.c3": "Ein Tastendruck bis zum Agenten. Keine Anmeldung, keine Vertrauensabfrage.",
     "hero.eyebrow": "NixOS-Live-System · opencode · Claude Code · Codex",
     "hero.title": "Ein Rettungsstick<br>mit einem <em>Agenten</em> drin.",
     "hero.lead": "Boote ihn auf dem Rechner, der nicht mehr startet. Der Agent hängt das installierte System nur lesend ein, liest mit dir die Logs und fragt, bevor er etwas ändert. Dein Key steckt schon vor dem ersten Booten im Image.",

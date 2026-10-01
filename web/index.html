@@ -41,6 +41,7 @@
     <a href="#" class="product">Rescue</a>
   </div>
   <nav>
+    <a href="#screens" data-i18n="nav.screens">Screenshots</a>
     <a href="#download" data-i18n="nav.download">Download</a>
     <a href="#how" data-i18n="nav.how">How it works</a>
     <a href="#build" data-i18n="nav.build">Build</a>
@@ -111,6 +112,30 @@
       <h3 data-i18n="f6.t">Careful by default</h3>
       <p data-i18n="f6.p">Read-only first. Destructive commands only after an explicit yes. A backup of every file before it is edited.</p>
     </article>
+  </section>
+
+  <section class="screens" id="screens">
+    <div class="section-head">
+      <h2 data-i18n="sc.title">What you see after boot</h2>
+      <p data-i18n="sc.sub">Real screenshots of v0.1.0 in a VM. No desktop, no installer: a console that is ready to work.</p>
+    </div>
+    <figure class="shot big">
+      <div class="shot-bar"><span></span><span></span><span></span><em>tty1 · Agentic Rescue</em></div>
+      <img src="screens/console.png" width="1280" height="800" loading="lazy" alt="Console after boot: RESCUE logo, status of network, AI and disk, and the menu">
+      <figcaption data-i18n="sc.c1">Boot, and the menu is there. Network, AI provider and disk at a glance.</figcaption>
+    </figure>
+    <div class="shot-row">
+      <figure class="shot">
+        <div class="shot-bar"><span></span><span></span><span></span><em>rescue-connect</em></div>
+        <img src="screens/qr.png" width="1280" height="800" loading="lazy" alt="QR code to enter an API key on the phone">
+        <figcaption data-i18n="sc.c2">No key in the image? Scan the QR code and type it on your phone.</figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shot-bar"><span></span><span></span><span></span><em>opencode</em></div>
+        <img src="screens/opencode.png" width="1280" height="800" loading="lazy" alt="opencode started from the menu, using 2342.ai">
+        <figcaption data-i18n="sc.c3">One keypress to an agent. No sign-in, no trust prompts.</figcaption>
+      </figure>
+    </div>
   </section>
 
   <section class="download" id="download">
