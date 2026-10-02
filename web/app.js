@@ -9,6 +9,8 @@
   const t = (key, vars) => (T[lang][key] ?? T.en[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars?.[k] ?? "");
   const gb = (n) => (n / 1e9).toFixed(1) + " GB";
   const mb = (n) => (n / 1e6).toFixed(0);
+  // stats.2342.dev (Rybbit): only coarse facts, never keys or other form input.
+  const track = (name, props) => { try { window.rybbit && window.rybbit.event(name, props); } catch (e) { /* analytics must never break the page */ } };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   // ------------------------------------------------------------------ config
@@ -145,12 +147,14 @@
       document.body.appendChild(a);
       a.click();
       a.remove();
+      track("download", { variant, version: rel.version, mode: "github", configured: hasSettings(config()), provider: config().providers ? provider.id : "none" });
       $("bar").parentElement.classList.add("indeterminate");
       status(t("st.github", { name: rel.iso, size: gb(rel.size) }));
       $("step2").classList.add("done");
       return;
     }
     const cfg = config();
+    track("download", { variant, version: rel.version, mode: "stream", configured: hasSettings(cfg), provider: cfg.providers ? provider.id : "none" });
     $("go").disabled = true;
     status(t("st.start"));
     try {
@@ -205,6 +209,7 @@
         $("save-status").textContent = t("s3.saving", { done: mb(done), total: mb(blob.size) });
       });
       $("save-status").textContent = t(how === "fs" ? "s3.saved" : "s3.savedblob", { name });
+      track("iso_configured", { provider: cfg.providers ? provider.id : "none", wifi: Boolean(cfg.wifi), ssh: Boolean(cfg.ssh_authorized_keys), version: slot.version || "unknown" });
       $("step3").classList.add("done");
     } catch (e) {
       $("save-bar-wrap").hidden = true;
